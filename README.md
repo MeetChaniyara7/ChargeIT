@@ -2,7 +2,7 @@
 
 **BookMyShow for EV charging.** Find nearby charging stations, see which chargers are free, reserve a time slot, and start charging at the station with a one-time code.
 
-> College final-year project, built only with free tools and services. The full README (screenshots, team roles, demo) arrives in Phase 7.
+> Capstone (college final-year) project, built only with free tools and services. The full README (screenshots, team roles, demo) arrives in Phase 7.
 
 ## Documentation
 
