@@ -1,14 +1,17 @@
 # database/
 
-Everything about ChargeSpot's PostgreSQL database lives here. The design itself is in [docs/architecture.md](../docs/architecture.md), section 5.
+Everything about ChargeSpot's PostgreSQL database (hosted on Supabase). The design is in [docs/architecture.md](../docs/architecture.md), section 5; where the data comes from is in [docs/data.md](../docs/data.md); how to run it is in [docs/setup.md](../docs/setup.md), section 4.
 
-| Folder | What goes in it | Arrives in |
-|---|---|---|
-| `migrations/` | Numbered SQL files that build the schema, applied in order: `001_extensions.sql`, `002_users_vehicles.sql`, … Each file explains its constraints in comments. | Phase 2 |
-| `seeds/` | Scripts that create demo data: synthetic chargers and prices for stations missing them, demo users, demo bookings, demo kiosk devices. Everything they create is tagged `data_source = 'synthetic'`. | Phase 2 |
-| `imports/` | Scripts that load real stations from OpenStreetMap and Open Charge Map, plus the cleaning steps (operator-name merging, connector normalisation, duplicate removal). | Phase 2 |
-| `queries/` | Ready-made SQL to open in DBeaver: reports, data checks, and queries used in the jury demo (e.g. "today's bookings", "no-shows this week"). Read-only; nothing here changes data. | Phase 2 onward |
+| Path | What it is |
+|---|---|
+| `pipeline.py` | **Start here.** Builds or updates everything in order: `python -m database.pipeline` |
+| `migrate.py` | Applies `migrations/` in order and records them in `schema_migrations` |
+| `migrations/` | Numbered SQL files that define the schema. Each explains its rules in comments. **Never edit one that has been applied**; add a new numbered file instead. |
+| `imports/` | Loading real stations (`import_osm.py`, `import_ocm.py`, `import_legacy_manual.py`), cleaning rules (`normalize.py`), duplicate removal (`dedupe.py`), the Gujarat boundary check (`regions.py`) and a one-off user copy (`migrate_users.py`) |
+| `seeds/` | Generated data: per-operator charger profiles (`profiles.py`), gap filling (`synthetic.py`), demo accounts, bookings and kiosks (`demo_data.py`) |
+| `queries/` | Read-only SQL to open in DBeaver: today's bookings, a booking's history, no-shows, data quality |
+| `tests/` | Proof that the rules hold (no double booking, legal status changes only, row-level security) plus unit tests for cleaning and duplicates. They run against a throwaway local database. |
 
-The migration runner, `database/migrate.py`, applies `migrations/` and records what has run in a `schema_migrations` table.
+Run every command from the **repository root** with the backend's virtual environment active.
 
 Raw downloads and old exports are **not** stored here. They go in `data/` at the repository root, which is git-ignored.

@@ -30,6 +30,8 @@ This is the **step-by-step build plan** for ChargeSpot. For every phase it lists
 4. **Check the "Done when" list yourself** before approving. Run the commands, click through the app.
 5. **If something in the plan changes,** update `architecture.md` (the decision) and this file (the tasks) in the same branch, so the docs never drift from the code.
 
+**UI work has its own prompts.** The look and screen flow are agreed in [ui-flow.md](ui-flow.md). [ui-prompts.md](ui-prompts.md) has a UI pass to run before Phase 3, plus a UI prompt to run alongside each of Phases 3–7.
+
 **Prompts work for teammates too.** If one person owns a part of a phase, they can paste the prompt and add *"Only do tasks X.1–X.4"* at the end.
 
 ---
@@ -215,14 +217,15 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 - [ ] Works against Supabase **and** a plain local PostgreSQL (for tests). Migrations that need `pg_cron` skip it cleanly when the extension isn't available.
 
 **2.2 Migrations** (matching `architecture.md` section 5)
-- [ ] `001_extensions.sql`: `btree_gist`, `pgcrypto`; `pg_cron` only if available.
+- [ ] `001_extensions_and_types.sql`: `btree_gist`; shared domains (`connector_type`, `data_source`, `money_inr`) and the `set_updated_at()` trigger function. (`pg_cron` is added in Phase 5, with the jobs.)
 - [ ] `002_users_vehicles.sql`: `users` (keeps today's columns and IDs), `vehicles` (one default per user).
-- [ ] `003_stations_chargers.sql`: `operators`, `stations`, `chargers` with every CHECK list, `(data_source, external_ref)` unique, index on `(lat, lng)`, and a `haversine_km()` SQL function.
+- [ ] `003_stations_chargers.sql`: `operators`, `stations` (with `vehicle_category`, `estimated_fields`), `station_sources` (one row per outside record, keyed by `(data_source, external_ref)`), `chargers`, index on `(latitude, longitude)`, and a `haversine_km()` SQL function.
 - [ ] `004_bookings.sql`: `bookings` with the **exclusion constraint**, `[)` range check, one-hold-per-user index, walk-in user rule; `booking_events`; an `allowed_booking_transitions` table and the **trigger** that rejects illegal status changes and writes `booking_events`.
-- [ ] `005_charging.sql`: `charging_sessions`, `charger_events`.
-- [ ] `006_payments.sql`: `payments`, `webhook_events`.
-- [ ] `007_devices_misc.sql`: `station_devices`, `otp_attempts`, `geocode_cache`.
-- [ ] `008_rls.sql`: enable row-level security on **every** table, with no policies.
+- [ ] `005_station_devices.sql`: `station_devices`, `otp_attempts`.
+- [ ] `006_charging.sql`: `charging_sessions`, `charger_events`.
+- [ ] `007_payments.sql`: `payments`, `webhook_events`.
+- [ ] `008_geocode_cache.sql`: `geocode_cache`.
+- [ ] `009_row_level_security.sql`: enable row-level security on **every** table, with no policies.
 
 **2.3 Move existing users across**
 - [ ] One-off script `database/imports/migrate_users.py`: copies `users` (IDs, emails, Google IDs, roles) from the old local database to Supabase so existing Google logins keep working. **Skip** the test accounts (`*@example.com`, `ji@gmail.com`).
@@ -234,14 +237,14 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 **2.5 Cleaning helpers: `database/imports/normalize.py`**
 - [ ] **Operator names:** an alias table, e.g. `tata`, `TATA`, `Tata power`, `Tata Power EZ Charge` → `Tata Power`. The same for Jio-bp, Ather, Zeon, EESL, ChargeZone, Statiq and Shell.
 - [ ] **Connector names** → our list (OCM connection type IDs, OSM `socket:*` tags, and legacy values such as `GB_T` → `BHARAT_DC001`).
-- [ ] **Non-car filter:** battery swap (Honda e:swap, Battery Smart, Sun Mobility, "swap"), bike stations (Yulu), phone charging, cycle kiosks, plus two-wheeler networks if you chose to exclude them.
+- [ ] **Non-car filter:** battery swap (Honda e:swap, Battery Smart, Sun Mobility, "swap"), bike stations (Yulu), phone charging, cycle kiosks, are dropped. Two-wheeler networks and scooter-only plugs are **kept but tagged** `TWO_WHEELER` (decided: car-focused app now, possible two-wheeler section later).
 - [ ] Name clean-up: drop junk names like "Unknown Charging Station", using `<operator> – <area>` instead.
 
 **2.6 Import scripts**
 - [ ] `database/imports/import_legacy_manual.py`: imports the 10 `VERIFY-ST-*` stations and their chargers from `data/legacy/` as `data_source = manual`.
 - [ ] `database/imports/import_osm.py`: Overpass query for `amenity=charging_station` in Gujarat (`ISO3166-2=IN-GJ`). Raw response cached in `data/raw/` (git-ignored). Reads name, operator, `socket:*`, capacity and opening hours.
 - [ ] `database/imports/import_ocm.py`: Open Charge Map, `countrycode=IN`, Gujarat bounding box, key from env. Maps connection types and power; `Quantity` → that many chargers.
-- [ ] Both importers can be **re-run safely**: they update existing rows by `(data_source, external_ref)` instead of duplicating.
+- [ ] Both importers can be **re-run safely**: each outside record is remembered in `station_sources`, so a re-import updates the existing station (or the station it was merged into) instead of duplicating.
 - [ ] The region is a setting (default Gujarat), so other states can be added later.
 
 **2.7 Duplicate removal: `database/imports/dedupe.py`**
@@ -249,7 +252,7 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 - [ ] Priority: `manual` > `ocm` > `osm`. Chargers from the losing record are merged where they add information.
 - [ ] Writes a report of every merge to `data/raw/dedupe_report.csv` so a human can check it.
 
-**2.8 Synthetic data: `database/seeds/seed_synthetic.py`**
+**2.8 Synthetic data: `database/seeds/` (`profiles.py`, `synthetic.py`, `demo_data.py`) and `database/pipeline.py`, which runs every step in order**
 - [ ] For stations with no chargers, or chargers missing power or price: generate realistic chargers based on the operator (e.g. Tata Power: 1–2 × CCS2 30–60 kW at ₹18–22/kWh; malls: Type2 7–22 kW). Tagged `data_source = synthetic`.
 - [ ] **Deterministic:** seeded by station ID, so re-running gives the same result.
 - [ ] Demo users (one admin), demo vehicles, and **demo bookings for Ahmedabad** over the next 7 days (`CONFIRMED`, plus some `COMPLETED` in the past) so the slot grid looks realistic.
@@ -270,7 +273,7 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 - [ ] `docs/data.md`: where the data comes from, how it's cleaned, what "synthetic" means, licences and attribution (OSM ODbL, OCM CC BY 4.0).
 
 ### Done when
-- [ ] `python database/migrate.py` builds the whole schema on a fresh Supabase project.
+- [ ] `python -m database.pipeline` builds the whole schema and data on a fresh Supabase project.
 - [ ] Running the imports, dedupe and seed (in the documented order) gives Gujarat stations with no obvious duplicates and the 10 manual stations intact.
 - [ ] The existing map shows the new Gujarat data.
 - [ ] You can still sign in with your Google account (users migrated).

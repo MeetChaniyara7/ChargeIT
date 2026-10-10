@@ -36,6 +36,14 @@ npm run lint                 # oxlint (config in frontend/user-web/.oxlintrc.jso
 npm run generate:api-types   # API must be running; regenerates frontend/shared/src/api-types.ts
 ```
 
+Database (from the repo root, backend venv active; URLs come from `backend/.env`):
+
+```bash
+python -m database.pipeline              # migrate + import + dedupe + synthetic + demo data (re-runnable)
+python -m database.migrate --status      # which migrations ran
+python -m pytest database/tests          # needs TEST_DATABASE_URL (a throwaway LOCAL db; tests wipe it)
+```
+
 ## Architecture
 
 **Config:** every setting comes from env vars via `app/config.py` (`get_settings()`); there are no hard-coded secrets or fallbacks. The API refuses to start without `DATABASE_URL`, `JWT_SECRET_KEY`, `GOOGLE_CLIENT_ID` and `FRONTEND_URL`. Business rules (slot length, fees, windows, refund tiers) live in `BOOKING_RULES` in the same file.
@@ -46,7 +54,7 @@ npm run generate:api-types   # API must be running; regenerates frontend/shared/
 
 **Auth:** the API issues its own JWT (`features/auth/tokens.py`). Use `Depends(get_current_user)` or `Depends(require_admin)` from `features/auth/dependencies.py`. Google sign-in works via the ID-token flow (`POST /api/auth/google`, used by the Google button) and a redirect flow (`/auth/google/login`, protected by a random `state` cookie). Front-end auth routes live under `/auth/*`, with the Google ones also under `/api/auth/*`.
 
-**Database (until Phase 2):** there are no migrations yet and nothing creates tables at startup. The models map to the existing hand-edited schema, so some attribute names differ from column names: `Station.name` is in `station_name`, `Charger.charger_code` is in `charger_number`, and `Station.is_active` is a Python property, not a column. Phase 2 replaces this with numbered SQL migrations.
+**Database:** PostgreSQL on Supabase. The schema is defined ONLY by numbered SQL files in `database/migrations/`; SQLAlchemy models mirror it and never create tables. Never edit an applied migration; add a new numbered file (and enable row-level security on any new table; a test checks this). Key rules live in the database itself: the `bookings_no_double_booking` exclusion constraint (catch SQLSTATE 23P01; on 40P01 deadlock retry once) and the `allowed_booking_transitions` table plus trigger (pass who/why via `set_config('chargespot.actor'/'chargespot.reason', ..., true)`). One charger row = one bookable plug. `data_source`/`estimated_fields` mark generated values; the app shows only `vehicle_category = 'FOUR_WHEELER'` stations.
 
 **Web app:** feature folders under `src/features/` (`auth`, `stations`, `home`), routes in `src/app/App.tsx`. Every API call goes through `src/lib/api.ts` (`apiFetch`), which adds the Bearer token, parses the error format into `ApiError`, and on 401 clears the token and fires `chargespot:unauthorized` (`AuthContext` listens and signs out). The token is in `localStorage['token']`.
 

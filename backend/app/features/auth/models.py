@@ -1,4 +1,5 @@
-"""The users table (accounts from Google sign-in or email registration)."""
+"""The users table: accounts from Google sign-in or email registration
+(schema: database/migrations/002_users_vehicles.sql)."""
 
 import uuid
 

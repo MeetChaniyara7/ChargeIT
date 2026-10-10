@@ -220,53 +220,22 @@ export interface components {
              * Format: uuid
              */
             charger_id: string;
-            /**
-             * Station Id
-             * Format: uuid
-             */
-            station_id: string;
-            /** Charger Code */
-            charger_code?: string | null;
-            /**
-             * Status
-             * @default AVAILABLE
-             */
-            status: string;
-            /** Connectors */
-            connectors?: components["schemas"]["ConnectorResponse"][];
-        };
-        /** ConnectorResponse */
-        ConnectorResponse: {
-            /**
-             * Connector Id
-             * Format: uuid
-             */
-            connector_id: string;
-            /**
-             * Charger Id
-             * Format: uuid
-             */
-            charger_id: string;
-            /**
-             * Connector Type
-             * @default CCS2
-             */
+            /** Label */
+            label: string;
+            /** Connector Type */
             connector_type: string;
-            /**
-             * Power Kw
-             * @default 50
-             */
-            power_kw: number;
-            /**
-             * Price Per Kwh
-             * @default 15
-             */
-            price_per_kwh: number;
-            /**
-             * Status
-             * @default AVAILABLE
-             */
+            /** Current Type */
+            current_type?: string | null;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+            /** Status */
             status: string;
+            /** Data Source */
+            data_source: string;
+            /** Is Estimated */
+            is_estimated: boolean;
         };
         /** GoogleLoginRequest */
         GoogleLoginRequest: {
@@ -278,12 +247,20 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** StationCreate */
+        /**
+         * StationCreate
+         * @description Admins add stations by hand; they are tagged data_source = 'manual'.
+         */
         StationCreate: {
             /** Name */
             name: string;
-            /** Address */
+            /**
+             * Address
+             * @default
+             */
             address: string;
+            /** City */
+            city?: string | null;
             /** Latitude */
             latitude: number;
             /** Longitude */
@@ -302,19 +279,31 @@ export interface components {
             name: string;
             /** Address */
             address: string;
+            /** City */
+            city?: string | null;
             /** Latitude */
             latitude: number;
             /** Longitude */
             longitude: number;
-            /** Operator Id */
-            operator_id?: string | null;
+            /** Operator Name */
+            operator_name?: string | null;
+            /** Vehicle Category */
+            vehicle_category: string;
+            /** Opening Hours */
+            opening_hours?: string | null;
+            /** Rating */
+            rating?: number | null;
             /**
-             * Is Active
-             * @default true
+             * Rating Count
+             * @default 0
              */
+            rating_count: number;
+            /** Is Active */
             is_active: boolean;
-            /** Created At */
-            created_at?: string | null;
+            /** Data Source */
+            data_source: string;
+            /** Has Estimated Data */
+            has_estimated_data: boolean;
             /** Chargers */
             chargers?: components["schemas"]["ChargerResponse"][];
         };

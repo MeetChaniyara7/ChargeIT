@@ -1,41 +1,36 @@
 """Database queries for stations."""
 
-import math
 from uuid import UUID
 
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.features.stations.models import Charger, Station
+from app.features.stations.models import Station
+
+# The app is car-focused for now; two-wheeler stations stay in the database for a future section.
+DEFAULT_CATEGORY = "FOUR_WHEELER"
 
 
-def _has_valid_coordinates(station: Station) -> bool:
-    lat, lng = station.latitude, station.longitude
+def _with_details(db: Session):
+    # Chargers load in one extra query for all stations, instead of one query per station.
+    return db.query(Station).options(selectinload(Station.chargers), joinedload(Station.operator))
+
+
+def list_stations(db: Session, vehicle_category: str = DEFAULT_CATEGORY) -> list[Station]:
+    """Active stations for one vehicle category. (Phase 3 adds map-area and radius filters.)"""
     return (
-        isinstance(lat, (int, float))
-        and isinstance(lng, (int, float))
-        and math.isfinite(lat)
-        and math.isfinite(lng)
-        and -90 <= lat <= 90
-        and -180 <= lng <= 180
+        _with_details(db)
+        .filter(Station.is_active, Station.vehicle_category == vehicle_category)
+        .order_by(Station.name)
+        .all()
     )
 
 
-def _with_chargers(db: Session):
-    # Load chargers and their connectors in two extra queries instead of one per station.
-    return db.query(Station).options(selectinload(Station.chargers).selectinload(Charger.connectors))
-
-
-def list_stations(db: Session) -> list[Station]:
-    """Every station that can be placed on a map. Rows with broken coordinates are skipped."""
-    return [s for s in _with_chargers(db).all() if _has_valid_coordinates(s)]
-
-
 def get_station(db: Session, station_id: UUID) -> Station | None:
-    return _with_chargers(db).filter(Station.station_id == station_id).first()
+    return _with_details(db).filter(Station.station_id == station_id).first()
 
 
 def create_station(db: Session, **fields) -> Station:
-    station = Station(**fields)
+    station = Station(**fields, data_source="manual")
     db.add(station)
     db.commit()
     db.refresh(station)

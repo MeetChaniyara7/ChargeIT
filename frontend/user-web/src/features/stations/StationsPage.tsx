@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CONNECTOR_LABELS, type ConnectorType, type components } from '@chargespot/shared';
 import { apiFetch } from '../../lib/api';
 import { SearchBar } from './SearchBar';
 import { StationCard } from './StationCard';
@@ -18,26 +19,11 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 };
 
-interface ApiConnector {
-  connector_type: string;
-  price_per_kwh: number;
-  status: string;
-}
+// Shapes generated from the API (frontend/shared/src/api-types.ts). Each charger is one plug.
+type ApiStation = components['schemas']['StationResponse'];
 
-interface ApiCharger {
-  charger_id: string;
-  status: string;
-  connectors: ApiConnector[];
-}
-
-interface ApiStation {
-  station_id: string;
-  name: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  chargers: ApiCharger[];
-}
+const connectorLabel = (type: string): string =>
+  CONNECTOR_LABELS[type as ConnectorType] ?? type;
 
 const isValidCoordinate = (latitude: number, longitude: number): boolean =>
   Number.isFinite(latitude) && Number.isFinite(longitude) &&
@@ -58,13 +44,10 @@ const mapApiStation = (item: ApiStation): StationData | null => {
   if (!isValidCoordinate(item.latitude, item.longitude)) return null;
 
   const chargers = Array.isArray(item.chargers) ? item.chargers : [];
-  const connectors = chargers.flatMap((charger) =>
-    Array.isArray(charger.connectors) ? charger.connectors : []
-  );
-  const availableConnectors = connectors.filter((connector) => connector.status === 'AVAILABLE');
-  const prices = availableConnectors
-    .map((connector) => connector.price_per_kwh)
-    .filter((price) => Number.isFinite(price));
+  const prices = chargers
+    .filter((charger) => charger.status === 'AVAILABLE')
+    .map((charger) => charger.price_per_kwh)
+    .filter((price): price is number => typeof price === 'number' && Number.isFinite(price));
   const statusCounts = chargers.reduce<Record<string, number>>((counts, charger) => {
     counts[charger.status] = (counts[charger.status] ?? 0) + 1;
     return counts;
@@ -74,12 +57,13 @@ const mapApiStation = (item: ApiStation): StationData | null => {
     station_id: String(item.station_id),
     name: item.name,
     address: item.address,
+    city: item.city ?? undefined,
     latitude: item.latitude,
     longitude: item.longitude,
     total_chargers: chargers.length,
     available_chargers: chargers.filter((charger) => charger.status === 'AVAILABLE').length,
     price_per_kwh: prices.length > 0 ? Math.min(...prices) : undefined,
-    connector_types: [...new Set(connectors.map((connector) => connector.connector_type))],
+    connector_types: [...new Set(chargers.map((charger) => connectorLabel(charger.connector_type)))],
     charger_status_summary: Object.entries(statusCounts)
       .map(([status, count]) => `${count} ${status.toLowerCase()}`)
       .join(', '),

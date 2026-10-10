@@ -205,6 +205,7 @@ erDiagram
     users ||--o{ bookings : makes
     operators ||--o{ stations : runs
     stations ||--o{ chargers : has
+    stations ||--o{ station_sources : "built from"
     stations ||--o{ station_devices : "has kiosk"
     chargers ||--o{ bookings : "is booked in"
     chargers ||--o{ charger_events : reports
@@ -223,9 +224,15 @@ erDiagram
     stations {
         uuid station_id PK
         text name
-        float lat
-        float lng
+        float latitude
+        float longitude
+        text vehicle_category "FOUR_WHEELER|TWO_WHEELER"
         text data_source "ocm|osm|synthetic|manual"
+    }
+    station_sources {
+        text data_source PK
+        text external_ref PK
+        uuid station_id FK
     }
     chargers {
         uuid charger_id PK
@@ -273,8 +280,9 @@ erDiagram
 | `users` | email (unique, lower-case), full_name, phone, google_user_id (unique), password_hash (optional), role `USER`/`ADMIN` | From Google sign-in or email registration. |
 | `vehicles` | user_id, nickname, connector_type, battery_kwh | One default vehicle per user (partial unique index). |
 | `operators` | name (normalised, unique), website | "Tata Power", "Jio-bp", … Duplicate spellings are merged on import. |
-| `stations` | name, address, city, state, postcode, lat, lng, operator_id, amenities, opening hours, rating, is_active, **data_source**, external_ref | `external_ref` is e.g. `osm:node/123` or `ocm:4567`; `(data_source, external_ref)` is unique so imports can be re-run safely. Indexed on (lat, lng). |
-| `chargers` | station_id, label (e.g. "CCS2-1"), connector_type, current_type `AC`/`DC`, power_kw, price_per_kwh, **status**, **data_source** | **One row = one bookable plug.** `data_source` is per charger because an imported station can have synthetic chargers. |
+| `stations` | name, address, city, state, postcode, latitude, longitude, operator_id, **vehicle_category**, amenities, opening hours, rating, is_active, **data_source**, **estimated_fields** | `vehicle_category` is `FOUR_WHEELER` or `TWO_WHEELER`; the app shows four-wheeler stations for now. `estimated_fields` lists generated values (e.g. `{rating}`). Indexed on (latitude, longitude). |
+| `station_sources` | **(data_source, external_ref)** primary key, station_id | Every outside record a station was built from, e.g. `('osm', 'node/123')`, `('ocm', '257048')`. When duplicates merge, their records point at the survivor, so re-running an import updates it instead of re-creating the duplicate. |
+| `chargers` | station_id, label (e.g. "CCS2-1", unique per station), connector_type, current_type `AC`/`DC`, power_kw, price_per_kwh, **status**, **data_source**, **estimated_fields** | **One row = one bookable plug.** `data_source` is per charger because an imported station can have synthetic chargers; `estimated_fields` marks a real charger's generated values (e.g. `{price_per_kwh}`). |
 | `bookings` | user_id, charger_id, vehicle_id, **time_range**, **source**, **status**, hold_expires_at, otp_hash, otp_used_at, booking_fee, refund_amount, cancelled_at | See 5.3 for the constraints. |
 | `booking_events` | booking_id, from_status, to_status, actor `USER`/`DEVICE`/`SYSTEM`/`ADMIN`, reason, at | Written automatically by a trigger. A full audit trail of every status change. |
 | `charging_sessions` | booking_id, charger_id, device_id, **source**, started_at, ended_at, end_reason, energy_kwh, **bill_amount**, **bill_status**, prepaid_amount, paid_at | Live energy and % are **calculated** from elapsed time × charger power, not stored every second. |
@@ -285,8 +293,10 @@ erDiagram
 | `charger_events` | charger_id, event (`AVAILABLE`, `CHARGING`, `FINISHED`, `FAULTED`, …), source, at | Simulated OCPP messages (see 7.4). |
 | `geocode_cache` | normalised query, result, fetched_at | Avoids repeating Nominatim calls. |
 
-**Lists used in CHECK constraints** (mirrored in `frontend/shared`):
+**Lists used in CHECK constraints** (mirrored in `frontend/shared`). Lists used by several tables are PostgreSQL **domains** (named column types with a built-in check: `connector_type`, `data_source`, `money_inr`), so every table uses the same definition:
 
+- **Data source:** `manual`, `ocm`, `osm`, `synthetic`
+- **Vehicle category (stations):** `FOUR_WHEELER`, `TWO_WHEELER`
 - **Connector types:** `CCS2`, `TYPE2`, `CHADEMO`, `BHARAT_AC001`, `BHARAT_DC001` (displayed as "Bharat DC-001 (GB/T)"), `TYPE1`, `OTHER`
 - **Charger status** (the live physical state, reported by the charger): `AVAILABLE`, `RESERVED`, `CHARGING`, `FAULTED`, `OUT_OF_SERVICE`
 - **Booking source:** `APP` (booked ahead, ₹199 fee), `INSTANT` ("Charge now" in the web app, no fee), `WALK_IN` (kiosk QR, no account)
@@ -300,7 +310,8 @@ The most important rule in the project is enforced **by PostgreSQL itself**, not
 
 ```sql
 -- One charger can never have two live bookings whose time ranges overlap.
-ALTER TABLE bookings ADD CONSTRAINT no_double_booking
+-- (database/migrations/004_bookings.sql)
+CONSTRAINT bookings_no_double_booking
   EXCLUDE USING gist (
     charger_id WITH =,      -- same charger
     time_range WITH &&      -- overlapping time
@@ -309,6 +320,8 @@ ALTER TABLE bookings ADD CONSTRAINT no_double_booking
 ```
 
 Why this matters: an application-level check ("is the slot free? then insert") has a gap between the check and the insert, so two requests can both pass the check. The database constraint has no gap. When it rejects a booking (error code `23P01`), the API replies **"This slot was just taken"** together with alternative times and chargers.
+
+**When two bookings arrive at exactly the same instant**, each waits for the other to finish, and PostgreSQL may break the tie by cancelling one with a **deadlock** error (`40P01`) instead of `23P01`. A double booking still cannot happen. The API's rule: **on `40P01`, retry the booking once**; the retry then gets a clean `23P01`. The concurrency test in `database/tests/` does exactly this and passes reliably.
 
 The constraint covers **every** way a charger gets used: app bookings, instant bookings and kiosk walk-ins are all rows in `bookings`. A walk-in can therefore never overlap an app booking.
 
@@ -581,22 +594,24 @@ The scoring code is **pure functions** with no database or network access, so it
 
 ## 13. Station data strategy
 
-Real Indian charging data is incomplete, especially prices and connector details. Our approach:
+Real Indian charging data is incomplete, especially prices and connector details. Our approach (full details, step by step, in [data.md](data.md)):
 
 1. **Keep the 10 hand-verified Ahmedabad stations** from the old database (`VERIFY-ST-001` to `010`, operators such as Tata Power, IOCL, CESL and Jio-bp) as `data_source = manual`.
-2. **Import Gujarat first** from OpenStreetMap (Overpass API, `amenity=charging_station`) and Open Charge Map (free API key). Other states can be added later by changing one setting.
+2. **Import Gujarat first** from Open Charge Map (free API key) and OpenStreetMap (Overpass API, `amenity=charging_station`). Other states can be added later by changing one setting.
 3. **Clean the data:**
-   - **Remove duplicates:** stations within **~50 m** with similar names are merged.
+   - **Check location:** points are tested against Gujarat's real boundary (from OpenStreetMap). Records whose address names another state are skipped, because their coordinates are wrong.
+   - **Remove duplicates:** stations within **~50 m** with similar names are merged (manual > ocm > osm); every merge goes into a report.
    - **Merge operator spellings,** e.g. `tata`, `TATA`, `Tata power`, `Tata Power EZ Charge` → **Tata Power**.
    - **Standardise connector names** to our list (GB/T → Bharat DC-001, and so on).
-   - **Drop things that aren't car chargers:** battery-swap points (Honda e:swap, Battery Smart, Sun Mobility), bike stations (Yulu), phone-charging points.
-4. **Fill gaps with synthetic data,** clearly labelled. Stations with no charger details get realistic chargers, power and prices based on the operator and location, tagged `data_source = synthetic`. Ahmedabad also gets demo bookings so the slot grid looks realistic.
-5. **Be honest in the UI.** Synthetic chargers show a small **"approximate data"** badge. Unknown values show "unknown" and are never invented.
+   - **Drop things that aren't chargers:** battery-swap points (Honda e:swap, Battery Smart, Sun Mobility), bike stations (Yulu), phone-charging points.
+   - **Tag two-wheeler stations** (Ather Grid, Ola, scooter-only plugs) as `TWO_WHEELER` instead of deleting them. The app shows four-wheeler stations only; a two-wheeler section can be added later without re-importing.
+4. **Fill gaps with synthetic data,** clearly labelled. Stations with no charger details get realistic chargers based on the operator (`data_source = synthetic`); real chargers missing power or price get estimates (listed in `estimated_fields`). Ahmedabad also gets a week of demo bookings so the slot grid looks realistic.
+5. **Be honest in the UI.** Anything synthetic or estimated shows a small **"approximate data"** badge. Unknown values show "unknown" and are never invented.
 6. **Admin page** to add or correct stations and chargers by hand (`data_source = manual`).
 
 **Licences:** OpenStreetMap data is ODbL and Open Charge Map is CC BY 4.0. Both require attribution, shown in the app footer and the README.
 
-The old exported CSVs live in `/data/legacy/` and are **git-ignored**. The exported `users` table is **not** imported; users simply sign in with Google again.
+The old exported CSVs live in `data/legacy/` and are **git-ignored**. The exported `users.csv` is **not** used; accounts are copied once from the old database itself, without test accounts, so existing logins keep working.
 
 ---
 
