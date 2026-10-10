@@ -41,7 +41,7 @@ These apply to every prompt below. Each prompt reminds Claude Code to follow the
 1. **Scope:** only the current phase's tasks. Note anything else under "Suggestions for later" in the summary.
 2. **Don't rewrite working login or navigation.** Move and adapt them, but keep the behaviour.
 3. **Ask before** adding any dependency not listed in the phase, or any paid service.
-4. **Already approved:** `razorpay` (Python SDK), `pytest`, `openapi-typescript` (dev), `qrcode.react` (kiosk).
+4. **Already approved:** `razorpay` (Python SDK), `pytest`, `openapi-typescript` (run on demand via `npx`, because it requires TypeScript 5 and the project uses 6), `qrcode.react` (kiosk).
 5. **Secrets only in `.env`** files. Every app has an up-to-date `.env.example`. Never commit keys or `data/legacy/*.csv`.
 6. **Small, clearly named files**, organised by feature (router → service → repository → schemas).
 7. **Explain key decisions in short code comments**. The jury reads the code.
@@ -94,16 +94,17 @@ These apply to every prompt below. Each prompt reminds Claude Code to follow the
 ### Tasks
 
 **1.1 Repository setup**
-- [ ] Root `package.json` with **npm workspaces**: `apps/user-web`, `apps/station-kiosk` (placeholder until Phase 6), `packages/shared`.
+- [ ] Root `package.json` with **npm workspaces**: `frontend/user-web`, `frontend/shared` (`frontend/kiosk` is added to the list in Phase 6, when it exists).
 - [ ] Root scripts: `dev:web`, `dev:api`, `build`, `lint`, `test:api`.
 - [ ] `.gitignore`: add `data/legacy/`, `data/raw/`, `.vite/`, every `.env` except `.env.example`, Python caches, `.venv`.
 - [ ] Remove the committed `.vite/` folder from git.
 - [ ] Move the exported CSVs into `data/legacy/` (git-ignored). **Never** commit `users.csv`.
 
-**1.2 Move the API: `backend/` → `apps/api/`**
+**1.2 Restructure the API inside `backend/`**
 - [ ] Use `git mv` so history is kept.
+- [ ] Create the top-level `database/` folder (with a README explaining `migrations/`, `seeds/`, `imports/`, `queries/`) for Phase 2.
 - [ ] Turn it into a proper Python package `app/`, run with `uvicorn app.main:app`. Replace flat imports (`import models`) with package imports.
-- [ ] Create `app/features/` with `auth/`, `stations/` and `admin/` for now. Later phases add the others.
+- [ ] Create `app/features/` with `auth/` and `stations/` for now. Later phases add the others (`admin/` in Phase 7, when it has endpoints; `require_admin` already exists in `auth/dependencies.py`).
 - [ ] Move the auth code (`routes/auth.py`, `auth/*.py`) into `app/features/auth/` **with logic unchanged**. Only imports and config access change.
 
 **1.3 Configuration and secrets**
@@ -111,7 +112,7 @@ These apply to every prompt below. Each prompt reminds Claude Code to follow the
 - [ ] **Fail fast:** the API refuses to start if `DATABASE_URL`, `JWT_SECRET_KEY` or `GOOGLE_CLIENT_ID` is missing. Remove every hard-coded fallback: the DB URL with the old password, the default JWT secret, the Google client ID.
 - [ ] `CORS_ORIGINS` and `FRONTEND_URL` come from config. No hard-coded `localhost`.
 - [ ] Put the business constants from `architecture.md` section 15 into `config.py` (slot length, fees, windows, refund tiers…). They'll be used in later phases.
-- [ ] Update `apps/api/.env.example` with every variable and a comment for each.
+- [ ] Update `backend/.env.example` with every variable and a comment for each.
 
 **1.4 Security fixes**
 - [ ] **Delete** the unsafe routes: `GET /api/users`, `POST /api/users/sync`, `GET /api/reservations/user/{id}`, `POST /api/reservations`, `GET/POST /api/sessions…`, `GET /api/chargers`, `GET /api/connectors`, `GET /api/operators`. Bookings and sessions are rebuilt properly in Phases 4–6.
@@ -130,7 +131,7 @@ These apply to every prompt below. Each prompt reminds Claude Code to follow the
 - [ ] `requirements-dev.txt` with `pytest` and `httpx`.
 - [ ] Tests: health check; `/auth/me` without a token → 401; a JWT can be created and read back; the app refuses to start without `JWT_SECRET_KEY`; removed routes return 404.
 
-**1.7 Move the web app: `frontend/` → `apps/user-web/`**
+**1.7 Move the web app: `frontend/` → `frontend/user-web/`** (the kiosk joins it as `frontend/kiosk/` in Phase 6)
 - [ ] `git mv`, then organise by feature:
   - `src/app/`: `App.tsx`, routes
   - `src/features/auth/`: `AuthContext`, `LoginForm`, `RegisterForm`, `ProtectedRoute`, auth service, types
@@ -140,13 +141,13 @@ These apply to every prompt below. Each prompt reminds Claude Code to follow the
   - `src/lib/api.ts`: one `fetch` wrapper that adds the `Authorization` header, parses the error format and handles 401
 - [ ] Remove `Header.tsx`, `App.css`, `AgentFloatingButton`, and the Supabase-auth leftovers (`isSupabaseConfigured` and its use in `RegisterForm`). Keep the `@supabase/supabase-js` dependency for Phase 5 realtime.
 - [ ] Google client ID only from `VITE_GOOGLE_CLIENT_ID`; remove the hard-coded fallback.
-- [ ] Env var `VITE_API_URL` (rename from `VITE_BACKEND_URL`). Remove `VITE_CARTO_API_KEY`, since CARTO needs no key.
+- [ ] Env var `VITE_API_URL` (rename from `VITE_BACKEND_URL`). Remove `VITE_CARTO_API_KEY`: the map uses OpenStreetMap tiles, which need no key.
 - [ ] **Behaviour must not change:** login (Google and email), logout, protected dashboard and map all work exactly as before.
 
-**1.8 Shared package: `packages/shared/`**
+**1.8 Shared package: `frontend/shared/`**
 - [ ] `src/constants.ts`: booking statuses, booking sources, charger statuses, connector types with display labels, session sources, bill statuses, slot length. These **must match** the database CHECK lists in `architecture.md` 5.2.
 - [ ] `src/format.ts`: `formatIST(date)`, `formatINR(amount)`.
-- [ ] Script `generate:api-types`: runs `openapi-typescript` against the API's `/openapi.json` → `src/api-types.ts`.
+- [ ] Script `generate:api-types`: runs `npx openapi-typescript` against the API's `/openapi.json` → `src/api-types.ts`.
 - [ ] `user-web` imports from `@chargespot/shared`.
 
 **1.9 Branding: ChargeSpot**
@@ -210,7 +211,7 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 ### Tasks
 
 **2.1 Migration runner**
-- [ ] `scripts/migrate.py`: applies `db/migrations/NNN_name.sql` in order, each in a transaction, and records them in a `schema_migrations` table. `--status` lists applied and pending migrations.
+- [ ] `database/migrate.py`: applies `database/migrations/NNN_name.sql` in order, each in a transaction, and records them in a `schema_migrations` table. `--status` lists applied and pending migrations.
 - [ ] Works against Supabase **and** a plain local PostgreSQL (for tests). Migrations that need `pg_cron` skip it cleanly when the extension isn't available.
 
 **2.2 Migrations** (matching `architecture.md` section 5)
@@ -224,31 +225,31 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 - [ ] `008_rls.sql`: enable row-level security on **every** table, with no policies.
 
 **2.3 Move existing users across**
-- [ ] One-off script `scripts/migrate_users.py`: copies `users` (IDs, emails, Google IDs, roles) from the old local database to Supabase so existing Google logins keep working. **Skip** the test accounts (`*@example.com`, `ji@gmail.com`).
+- [ ] One-off script `database/imports/migrate_users.py`: copies `users` (IDs, emails, Google IDs, roles) from the old local database to Supabase so existing Google logins keep working. **Skip** the test accounts (`*@example.com`, `ji@gmail.com`).
 
 **2.4 API models**
 - [ ] Update the SQLAlchemy models to match the new schema, one `models.py` per feature.
-- [ ] Point `apps/api/.env` at Supabase. `GET /api/stations` must still work (returning the new data).
+- [ ] Point `backend/.env` at Supabase. `GET /api/stations` must still work (returning the new data).
 
-**2.5 Cleaning helpers: `scripts/normalize.py`**
+**2.5 Cleaning helpers: `database/imports/normalize.py`**
 - [ ] **Operator names:** an alias table, e.g. `tata`, `TATA`, `Tata power`, `Tata Power EZ Charge` → `Tata Power`. The same for Jio-bp, Ather, Zeon, EESL, ChargeZone, Statiq and Shell.
 - [ ] **Connector names** → our list (OCM connection type IDs, OSM `socket:*` tags, and legacy values such as `GB_T` → `BHARAT_DC001`).
 - [ ] **Non-car filter:** battery swap (Honda e:swap, Battery Smart, Sun Mobility, "swap"), bike stations (Yulu), phone charging, cycle kiosks, plus two-wheeler networks if you chose to exclude them.
 - [ ] Name clean-up: drop junk names like "Unknown Charging Station", using `<operator> – <area>` instead.
 
 **2.6 Import scripts**
-- [ ] `scripts/import_legacy_manual.py`: imports the 10 `VERIFY-ST-*` stations and their chargers from `data/legacy/` as `data_source = manual`.
-- [ ] `scripts/import_osm.py`: Overpass query for `amenity=charging_station` in Gujarat (`ISO3166-2=IN-GJ`). Raw response cached in `data/raw/` (git-ignored). Reads name, operator, `socket:*`, capacity and opening hours.
-- [ ] `scripts/import_ocm.py`: Open Charge Map, `countrycode=IN`, Gujarat bounding box, key from env. Maps connection types and power; `Quantity` → that many chargers.
+- [ ] `database/imports/import_legacy_manual.py`: imports the 10 `VERIFY-ST-*` stations and their chargers from `data/legacy/` as `data_source = manual`.
+- [ ] `database/imports/import_osm.py`: Overpass query for `amenity=charging_station` in Gujarat (`ISO3166-2=IN-GJ`). Raw response cached in `data/raw/` (git-ignored). Reads name, operator, `socket:*`, capacity and opening hours.
+- [ ] `database/imports/import_ocm.py`: Open Charge Map, `countrycode=IN`, Gujarat bounding box, key from env. Maps connection types and power; `Quantity` → that many chargers.
 - [ ] Both importers can be **re-run safely**: they update existing rows by `(data_source, external_ref)` instead of duplicating.
 - [ ] The region is a setting (default Gujarat), so other states can be added later.
 
-**2.7 Duplicate removal: `scripts/dedupe.py`**
+**2.7 Duplicate removal: `database/imports/dedupe.py`**
 - [ ] Stations within **~50 m** with similar names (or one generic name) are merged.
 - [ ] Priority: `manual` > `ocm` > `osm`. Chargers from the losing record are merged where they add information.
 - [ ] Writes a report of every merge to `data/raw/dedupe_report.csv` so a human can check it.
 
-**2.8 Synthetic data: `db/seeds/seed_synthetic.py`**
+**2.8 Synthetic data: `database/seeds/seed_synthetic.py`**
 - [ ] For stations with no chargers, or chargers missing power or price: generate realistic chargers based on the operator (e.g. Tata Power: 1–2 × CCS2 30–60 kW at ₹18–22/kWh; malls: Type2 7–22 kW). Tagged `data_source = synthetic`.
 - [ ] **Deterministic:** seeded by station ID, so re-running gives the same result.
 - [ ] Demo users (one admin), demo vehicles, and **demo bookings for Ahmedabad** over the next 7 days (`CONFIRMED`, plus some `COMPLETED` in the past) so the slot grid looks realistic.
@@ -269,7 +270,7 @@ anything not done, what's next) and STOP. Wait for my approval before Phase 2.
 - [ ] `docs/data.md`: where the data comes from, how it's cleaned, what "synthetic" means, licences and attribution (OSM ODbL, OCM CC BY 4.0).
 
 ### Done when
-- [ ] `python scripts/migrate.py` builds the whole schema on a fresh Supabase project.
+- [ ] `python database/migrate.py` builds the whole schema on a fresh Supabase project.
 - [ ] Running the imports, dedupe and seed (in the documented order) gives Gujarat stations with no obvious duplicates and the 10 manual stations intact.
 - [ ] The existing map shows the new Gujarat data.
 - [ ] You can still sign in with your Google account (users migrated).
@@ -285,10 +286,10 @@ Do PHASE 2 only: "Database, data import and seed", tasks 2.1–2.10.
 Create branch phase-2-database.
 
 Inputs I have prepared:
-- Supabase session-pooler URL is in apps/api/.env as DATABASE_URL.
-- The old local database URL is in apps/api/.env as LEGACY_DATABASE_URL (for the
+- Supabase session-pooler URL is in backend/.env as DATABASE_URL.
+- The old local database URL is in backend/.env as LEGACY_DATABASE_URL (for the
   one-off user copy in task 2.3).
-- OCM_API_KEY is in apps/api/.env.
+- OCM_API_KEY is in backend/.env.
 - Legacy CSV exports are in data/legacy/.
 - Two-wheeler-only networks: <EXCLUDE or KEEP>.
 
@@ -350,7 +351,7 @@ Phase 2; summarise and STOP. Wait for my approval before Phase 3.
 - [ ] Split the old dashboard into hooks: `useGeolocation` (**default Ahmedabad** 23.0225, 72.5714), `useStations(bounds)` (re-fetch when the map stops moving, debounced), `useGeocode`.
 - [ ] Search bar: on submit, match station names locally first, then geocode the place and move the map there.
 - [ ] `StationCard` and map popups: **remove every invented fallback value**, show **₹**, show "unknown" for missing data, show an **"approximate data"** badge when `has_synthetic_data`.
-- [ ] CARTO **dark** tiles, no key. Footer attribution for OpenStreetMap, CARTO and Open Charge Map.
+- [ ] OpenStreetMap tiles (darkened with CSS), no key. Footer attribution for OpenStreetMap and Open Charge Map.
 - [ ] If the map gets crowded with markers, propose `leaflet.markercluster` (ask before adding).
 
 **3.7 Web app: station page `/stations/:id`**
@@ -406,7 +407,7 @@ summarise and STOP. Wait for my approval before Phase 4.
 **Owner:** A (API), C (web app). **Effort:** 7–8 person-days.
 
 ### Before starting (you do these)
-- [ ] Create a free **Razorpay** account and switch to **Test mode**. Copy the test **Key ID** and **Key Secret** into `apps/api/.env`, and the Key ID into `apps/user-web/.env`.
+- [ ] Create a free **Razorpay** account and switch to **Test mode**. Copy the test **Key ID** and **Key Secret** into `backend/.env`, and the Key ID into `frontend/user-web/.env`.
 - [ ] Create a **webhook secret** in Razorpay (Settings → Webhooks). The webhook URL itself is set in Phase 7 once the API is deployed; locally we rely on the signature check.
 
 ### Tasks
@@ -492,7 +493,7 @@ Do PHASE 4 only: "Booking flow and payments", tasks 4.1–4.10.
 Create branch phase-4-booking.
 
 Inputs: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET and OTP_SECRET
-are in apps/api/.env; VITE_RAZORPAY_KEY_ID is in apps/user-web/.env (test mode).
+are in backend/.env; VITE_RAZORPAY_KEY_ID is in frontend/user-web/.env (test mode).
 
 Key constraints:
 - All status changes go through state_machine.transition(); its table must match
@@ -608,7 +609,7 @@ Phase 6.
 
 ### Tasks
 
-**6.1 Kiosk app scaffold: `apps/station-kiosk/`**
+**6.1 Kiosk app scaffold: `frontend/kiosk/`**
 - [ ] React + Vite + TypeScript + Tailwind, part of the npm workspace, using `@chargespot/shared`.
 - [ ] Designed for a **landscape tablet**: large touch targets, readable from 1 m, fullscreen, dark theme matching the web app.
 - [ ] `qrcode.react` for QR codes (approved).
@@ -701,7 +702,7 @@ Phase 7.
 - [ ] **Charger simulator panel:** buttons for each simulated event, including "Simulate external session".
 - [ ] **Alerts:** kiosk OTP-guessing alerts, failed webhooks.
 - [ ] **Reports:** bookings by status, no-shows, revenue (booking fees, energy, walk-ins), refunds, and **operator settlement** (energy revenue per operator).
-- [ ] `scripts/make_admin.py <email>` to promote a user.
+- [ ] `backend/scripts/make_admin.py <email>` to promote a user.
 
 **7.2 Edge cases (each one handled and tested)**
 - [ ] Charger goes out of service with future bookings.
@@ -727,8 +728,8 @@ Phase 7.
 
 **7.5 Deployment (free tiers)**
 - [ ] **Database:** run the migrations and seed on the Supabase project; check pg_cron jobs are scheduled and Realtime is enabled.
-- [ ] **API → Render** (free web service): root `apps/api`, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, all env vars set.
-- [ ] **Web app and kiosk → Vercel**: two projects with root directories `apps/user-web` and `apps/station-kiosk`, env vars set.
+- [ ] **API → Render** (free web service): root `backend`, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, all env vars set.
+- [ ] **Web app and kiosk → Vercel**: two projects with root directories `frontend/user-web` and `frontend/kiosk`, env vars set.
 - [ ] **Google OAuth:** add the production URLs to the authorised origins and redirect URIs.
 - [ ] **Razorpay:** set the webhook URL to the Render API; test mode stays on.
 - [ ] `CORS_ORIGINS` and `FRONTEND_URL` set to the production URLs.
@@ -776,7 +777,7 @@ Key constraints:
 - Admin routes require role ADMIN on the server, not just a hidden UI.
 - Taking a charger out of service must never silently break future bookings.
 - CI uses only free GitHub Actions and a PostgreSQL service container.
-- README must include team roles and OSM/OCM/CARTO attribution.
+- README must include team roles and OSM/OCM attribution.
 - Ask before adding any dependency (e.g. vitest).
 
 When finished: run everything; report the CI status, deployed URLs and smoke-test

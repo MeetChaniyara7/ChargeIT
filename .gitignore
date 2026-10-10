@@ -1,7 +1,27 @@
+# Secrets: every .env file stays local. Only .env.example files are committed.
 .env
+.env.*
+!.env.example
+
+# Data exports and raw downloads (may contain personal data or large files)
+data/legacy/
+data/raw/
+
+# Python
 __pycache__/
 *.pyc
-node_modules/
-dist/
 .venv/
 venv/
+.pytest_cache/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+*.log
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store

@@ -1,0 +1,17 @@
+{
+  "name": "@chargespot/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Constants, formatting helpers and API types shared by the ChargeSpot web app and kiosk.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "generate:api-types": "npx --yes openapi-typescript@7 http://localhost:8000/openapi.json -o src/api-types.ts"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}

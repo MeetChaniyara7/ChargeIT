@@ -59,7 +59,7 @@ flowchart LR
         RZ[Razorpay<br/>TEST MODE]
         OSRM[OSRM routing]
         NOM[Nominatim geocoding]
-        TILES[CARTO map tiles]
+        TILES[OpenStreetMap tiles]
     end
 
     U --> W
@@ -101,7 +101,7 @@ Everything is **free**. No paid service is used.
 | Migrations | Numbered plain `.sql` files plus a small Python runner | Easy for a reader to follow; the booking constraint has to be written in raw SQL anyway. Replaces the old `create_all()` call, which could never change existing tables. |
 | Background jobs | **pg_cron** (inside the database) | Render's free tier puts the API to sleep after about 15 idle minutes, so a timer inside the API would stop firing. pg_cron runs inside Supabase around the clock. |
 | Payments | **Razorpay test mode** | Free; supports UPI, cards and netbanking. The API verifies every payment with Razorpay's signature, never by trusting the browser. |
-| Maps | Leaflet with **CARTO** tiles | Free with attribution and no key. The dark style matches the UI. |
+| Maps | Leaflet with **OpenStreetMap** tiles | Free with attribution and no key. A CSS filter darkens them to match the UI. (CARTO basemaps now require an API key, so we don't use them.) |
 | Routing / travel time | OSRM public server, falling back to straight-line distance | Free. One request per recommendation. |
 | Address search | Nominatim (OpenStreetMap), called through the API with a cache | Free. Its usage policy forbids search-as-you-type, so we geocode only when the user presses Search. |
 | Shared front-end types | TypeScript types generated from the API's OpenAPI spec (`openapi-typescript`) | The two apps always match the API without hand-copying types. |
@@ -131,51 +131,67 @@ Phase 0 began with an audit of the existing code. Summary:
 
 ## 4. Folder structure
 
-One repository, organised as an **npm workspaces monorepo**. The Python API sits alongside the JavaScript workspaces.
+One repository with **four top-level areas**, named for what they are, so a new teammate or the jury can find anything quickly:
+
+| Folder | What it holds | Language |
+|---|---|---|
+| `backend/` | The API: every business rule | Python (FastAPI) |
+| `frontend/` | Everything that runs in a browser: the driver web app, the station kiosk, and the code they share | TypeScript (React) |
+| `database/` | The schema (migrations), demo data (seeds), station import scripts, and saved SQL queries | SQL + Python |
+| `docs/` | Architecture, build plan, setup guide | Markdown |
+
+The two front ends and their shared package form an **npm workspaces** monorepo (one `npm install` at the root). The backend is a separate Python project with its own virtual environment.
 
 ```
-/apps
-  /api                         ← was backend/
-    app/main.py                  app setup, middleware, routers
-    app/config.py                every setting and env var in one place
-    app/db.py                    database connection
-    app/features/
-      auth/                      Google + email login, JWT        (moved, not rewritten)
-      stations/                  station search by map area or radius
-      availability/              30-minute slot grid per charger
-      recommendations/           scoring.py (pure functions), osrm.py
-      bookings/                  state_machine.py, otp.py, service.py, repository.py
-      payments/                  Razorpay orders, signature check, webhook, refunds
-      charging/                  sessions, simulated energy meter, billing
-      kiosk/                     device auth, OTP start, walk-in start, rate limits
-      chargers/                  charger simulator (fake OCPP events)
-      geocoding/                 Nominatim proxy + cache
-      admin/                     station/charger editing, reports, alerts
-    tests/
-  /user-web                    ← was frontend/
-    src/app/                     App.tsx, routes
-    src/features/auth/           AuthContext, login/register forms, ProtectedRoute
-    src/features/stations/       map, list, search, station page
-    src/features/bookings/       slot grid, checkout, confirmation, My Bookings
-    src/features/charging/       live session page, energy bill payment
-    src/features/admin/          station/charger editor, walk-in reports
-    src/lib/                     api client, realtime, IST time formatting
-  /station-kiosk               new
-    src/features/device/         one-time device setup (API key)
-    src/features/status-board/   charger tiles: availability + progress
-    src/features/otp-start/      "Start with OTP"
-    src/features/walk-in/        "Take a charger" + payment QR
-/packages
-  /shared                      constants (statuses, connector types), generated API types
-/db
-  /migrations                  001_extensions.sql, 002_core_tables.sql, …
-  /seeds                       demo users/devices, synthetic charger generator
-/scripts                       migrate.py, import_osm.py, import_ocm.py, dedupe.py, normalize.py
-/docs                          architecture.md (this file), booking-flow.md, api.md, setup.md
-/data/legacy                   exported CSVs from the old database (git-ignored)
+backend/
+  app/main.py                    app setup, middleware, routers
+  app/config.py                  every setting and business rule in one place
+  app/db.py                      database connection
+  app/core/                      error format, logging
+  app/features/
+    auth/                        Google + email login, JWT, require_admin
+    stations/                    station search by map area or radius
+    availability/                30-minute slot grid per charger
+    recommendations/             scoring.py (pure functions), osrm.py
+    bookings/                    state_machine.py, otp.py, refunds.py, service.py, repository.py
+    payments/                    Razorpay orders, signature check, webhook, refunds
+    charging/                    sessions, simulated energy meter, billing
+    kiosk/                       device auth, OTP start, walk-in start, rate limits
+    chargers/                    charger simulator (fake OCPP events)
+    geocoding/                   Nominatim proxy + cache
+    vehicles/                    the user's vehicles
+    admin/                       station/charger editing, reports, alerts
+  scripts/                       admin helpers, e.g. make_admin.py
+  tests/
+frontend/
+  user-web/                      the driver web app (also hosts the admin pages)
+    src/app/                       App.tsx, routes
+    src/components/layout/         Navbar and other page chrome
+    src/features/auth/             AuthContext, login/register, ProtectedRoute
+    src/features/home/             landing page
+    src/features/stations/         map, list, search, station page
+    src/features/bookings/         slot grid, checkout, confirmation, My Bookings
+    src/features/charging/         live session page, energy bill payment
+    src/features/admin/            station/charger editor, reports
+    src/lib/                       api client, realtime
+  kiosk/                         the station screen (from Phase 6)
+    src/features/device/           one-time device setup (API key)
+    src/features/status-board/     charger tiles: availability + progress
+    src/features/otp-start/        "Start with OTP"
+    src/features/walk-in/          "Take a charger" + payment QR
+  shared/                        @chargespot/shared: constants (statuses, connector
+                                 types), ₹ and IST formatting, generated API types
+database/
+  migrate.py                     applies migrations in order
+  migrations/                    001_extensions.sql, 002_users_vehicles.sql, …
+  seeds/                         synthetic chargers, demo users, bookings and kiosk devices
+  imports/                       OSM + Open Charge Map import, normalise, dedupe
+  queries/                       saved read-only SQL for DBeaver: reports, checks, demo
+docs/                            architecture.md (this file), phases.md, setup.md, …
+data/                            raw downloads and legacy CSVs (git-ignored, never committed)
 ```
 
-Inside each feature, files follow the same pattern: **router** (HTTP), **service** (rules), **repository** (SQL), **schemas** (validation).
+**Inside each backend feature**, files follow the same pattern: **router** (HTTP), **service** (rules), **repository** (SQL), **schemas** (validation), **models** (tables). Front-end features keep their pages, components and hooks together in one folder.
 
 ---
 
@@ -269,7 +285,7 @@ erDiagram
 | `charger_events` | charger_id, event (`AVAILABLE`, `CHARGING`, `FINISHED`, `FAULTED`, …), source, at | Simulated OCPP messages (see 7.4). |
 | `geocode_cache` | normalised query, result, fetched_at | Avoids repeating Nominatim calls. |
 
-**Lists used in CHECK constraints** (mirrored in `packages/shared`):
+**Lists used in CHECK constraints** (mirrored in `frontend/shared`):
 
 - **Connector types:** `CCS2`, `TYPE2`, `CHADEMO`, `BHARAT_AC001`, `BHARAT_DC001` (displayed as "Bharat DC-001 (GB/T)"), `TYPE1`, `OTHER`
 - **Charger status** (the live physical state, reported by the charger): `AVAILABLE`, `RESERVED`, `CHARGING`, `FAULTED`, `OUT_OF_SERVICE`
@@ -601,7 +617,7 @@ The old exported CSVs live in `/data/legacy/` and are **git-ignored**. The expor
 
 ## 15. Configuration values
 
-All of these live in `apps/api/app/config.py`, so they can be changed without touching business logic.
+All of these live in `backend/app/config.py`, so they can be changed without touching business logic.
 
 | Setting | Value |
 |---|---|
@@ -637,6 +653,7 @@ All of these live in `apps/api/app/config.py`, so they can be changed without to
 | Razorpay test mode | No real money moves | Exactly what we want. Refunds are recorded, not sent. |
 | Razorpay webhooks | Need a public URL | Works on Render. Locally, a free tunnel (e.g. cloudflared) or rely on the signature check alone. |
 | OSRM public server | Light use only; no uptime guarantee | One request per recommendation, plus the straight-line fallback. |
+| OpenStreetMap tile server | Fair use only (light traffic, attribution shown, no bulk downloading) | Fine for a college project and demo. For real production traffic, switch to a free-tier tile provider with a key. |
 | Nominatim | Max 1 request/s; no search-as-you-type | Search only on submit, through the API, with a cache. |
 | Overpass / Open Charge Map | Rate limits | Imports are run occasionally by a script, not by users. |
 

@@ -1,0 +1,18 @@
+{
+  "name": "chargespot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ChargeSpot: book EV charging slots, start charging with an OTP, pay in the app.",
+  "workspaces": [
+    "frontend/user-web",
+    "frontend/shared"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @chargespot/user-web",
+    "dev:api": "cd backend && python -m uvicorn app.main:app --reload --port 8000",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test:api": "cd backend && python -m pytest",
+    "generate:api-types": "npm run generate:api-types --workspace @chargespot/shared"
+  }
+}
