@@ -1,9 +1,11 @@
 import os
+import math
 from typing import List
 from uuid import UUID
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, selectinload
 from dotenv import load_dotenv
 
 from database import get_db, engine, Base
@@ -95,7 +97,29 @@ def list_operators(db: Session = Depends(get_db)):
 # --- 3. STATIONS API ---
 @app.get("/api/stations", response_model=List[schemas.StationResponse], tags=["Stations"])
 def list_stations(db: Session = Depends(get_db)):
-    return db.query(models.Station).all()
+    try:
+        stations = (
+            db.query(models.Station)
+            .options(
+                selectinload(models.Station.chargers).selectinload(models.Charger.connectors)
+            )
+            .all()
+        )
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Charging station data is temporarily unavailable",
+        ) from exc
+
+    return [
+        station
+        for station in stations
+        if isinstance(station.latitude, (int, float))
+        and isinstance(station.longitude, (int, float))
+        and math.isfinite(station.latitude) and math.isfinite(station.longitude)
+        and -90 <= station.latitude <= 90
+        and -180 <= station.longitude <= 180
+    ]
 
 @app.get("/api/stations/{station_id}", response_model=schemas.StationResponse, tags=["Stations"])
 def get_station(station_id: UUID, db: Session = Depends(get_db)):
@@ -106,7 +130,7 @@ def get_station(station_id: UUID, db: Session = Depends(get_db)):
 
 @app.post("/api/stations", response_model=schemas.StationResponse, status_code=status.HTTP_201_CREATED, tags=["Stations"])
 def create_station(payload: schemas.StationCreate, db: Session = Depends(get_db)):
-    station = models.Station(**payload.model_dump())
+    station = models.Station(**payload.model_dump(exclude={"is_active"}))
     db.add(station)
     db.commit()
     db.refresh(station)

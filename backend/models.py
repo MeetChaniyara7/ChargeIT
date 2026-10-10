@@ -40,14 +40,17 @@ class Station(Base):
     __tablename__ = "stations"
 
     station_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False)
+    name = Column("station_name", String(255), nullable=False)
     address = Column(Text, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     operator_id = Column(UUID(as_uuid=True), ForeignKey("operators.operator_id"), nullable=True)
-    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    @property
+    def is_active(self):
+        return True
 
     operator = relationship("Operator", back_populates="stations")
     chargers = relationship("Charger", back_populates="station", cascade="all, delete-orphan")
@@ -58,7 +61,7 @@ class Charger(Base):
 
     charger_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     station_id = Column(UUID(as_uuid=True), ForeignKey("stations.station_id"), nullable=False)
-    charger_code = Column(String(50), nullable=True)
+    charger_code = Column("charger_number", String(50), nullable=True)
     status = Column(String(50), nullable=False, default="AVAILABLE")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

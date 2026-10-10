@@ -12,6 +12,7 @@ export interface StationData {
   available_chargers?: number;
   price_per_kwh?: number;
   connector_types?: string[];
+  charger_status_summary?: string;
   distance_km?: number;
 }
 

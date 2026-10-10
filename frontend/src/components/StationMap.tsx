@@ -2,6 +2,15 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import type { StationData } from './StationCard';
 
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;',
+  } as Record<string, string>)[character] ?? character);
+
 interface StationMapProps {
   stations: StationData[];
   userLocation: { lat: number; lng: number } | null;
@@ -20,6 +29,7 @@ export const StationMap: React.FC<StationMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
+  const userMarkerRef = useRef<L.Marker | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -36,10 +46,10 @@ export const StationMap: React.FC<StationMapProps> = ({
         zoomControl: false,
       });
 
-      // Add dark tile layer (CartoDB Dark Matter)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-        subdomains: 'abcd',
+      // Add CARTO raster basemap
+      const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY;
+      L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${encodeURIComponent(cartoApiKey)}`, {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         maxZoom: 19,
       }).addTo(map);
 
@@ -47,6 +57,7 @@ export const StationMap: React.FC<StationMapProps> = ({
       L.control.zoom({ position: 'topright' }).addTo(map);
 
       mapRef.current = map;
+      requestAnimationFrame(() => map.invalidateSize());
     }
 
     const map = mapRef.current;
@@ -54,6 +65,9 @@ export const StationMap: React.FC<StationMapProps> = ({
     // Clear existing station markers
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
+
+    userMarkerRef.current?.remove();
+    userMarkerRef.current = null;
 
     // 1. Add User Location Marker (Pulse Ring)
     if (userLocation) {
@@ -69,7 +83,7 @@ export const StationMap: React.FC<StationMapProps> = ({
         iconAnchor: [12, 12],
       });
 
-      L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
         .addTo(map)
         .bindTooltip('Your Current Location', { permanent: false, direction: 'top' });
     }
@@ -77,7 +91,7 @@ export const StationMap: React.FC<StationMapProps> = ({
     // 2. Add Station Markers
     stations.forEach((st) => {
       const isSelected = st.station_id === selectedStationId;
-      const available = st.available_chargers ?? 3;
+      const available = st.available_chargers ?? 0;
       const isAvailable = available > 0;
       const pinColor = isSelected ? '#10b981' : isAvailable ? '#06b6d4' : '#ef4444';
 
@@ -107,14 +121,22 @@ export const StationMap: React.FC<StationMapProps> = ({
       const marker = L.marker([st.latitude, st.longitude], { icon: stationIcon }).addTo(map);
 
       // Popup Content
+      const connectorTypes = st.connector_types?.length
+        ? st.connector_types.map(escapeHtml).join(', ')
+        : 'Not specified';
+      const price = st.price_per_kwh !== undefined
+        ? `$${st.price_per_kwh.toFixed(2)}/kWh`
+        : 'Price unavailable';
       const popupHtml = `
         <div style="padding: 4px; width: 200px;">
-          <h4 style="margin: 0; font-size: 13px; font-weight: bold; color: #ffffff;">${st.name}</h4>
-          <p style="margin: 4px 0; font-size: 11px; color: #94a3b8;">${st.address || 'Metro Station'}</p>
+          <h4 style="margin: 0; font-size: 13px; font-weight: bold; color: #ffffff;">${escapeHtml(st.name)}</h4>
+          <p style="margin: 4px 0; font-size: 11px; color: #94a3b8;">${escapeHtml(st.address || 'Metro Station')}</p>
           <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0; font-size: 11px;">
-            <span style="color: #10b981; font-weight: 600;">${st.available_chargers ?? 3}/${st.total_chargers ?? 4} Available</span>
-            <span style="color: #ffffff; font-weight: bold;">$${(st.price_per_kwh ?? 0.28).toFixed(2)}/kWh</span>
+            <span style="color: #10b981; font-weight: 600;">${st.available_chargers ?? 0}/${st.total_chargers ?? 0} Available</span>
+            <span style="color: #ffffff; font-weight: bold;">${price}</span>
           </div>
+          <p style="margin: 4px 0; font-size: 11px; color: #cbd5e1;">Connectors: ${connectorTypes}</p>
+          <p style="margin: 4px 0 8px; font-size: 11px; color: #cbd5e1;">Status: ${escapeHtml(st.charger_status_summary || 'No chargers')}</p>
           <button id="pop-nav-${st.station_id}" style="width: 100%; padding: 6px; background: #10b981; color: #ffffff; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 4px;">
             Reserve Slot
           </button>
@@ -137,19 +159,33 @@ export const StationMap: React.FC<StationMapProps> = ({
       markersRef.current[st.station_id] = marker;
     });
 
-    // Center map on selected station if any
+    // Center map on the selected station, user location, or all station markers.
     if (selectedStationId && markersRef.current[selectedStationId]) {
       const st = stations.find((s) => s.station_id === selectedStationId);
       if (st) {
         map.setView([st.latitude, st.longitude], 14, { animate: true });
         markersRef.current[selectedStationId].openPopup();
       }
+    } else if (userLocation) {
+      map.setView([userLocation.lat, userLocation.lng], 12, { animate: false });
+    } else if (stations.length > 0) {
+      const bounds = L.latLngBounds(
+        stations.map((station): [number, number] => [station.latitude, station.longitude])
+      );
+      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false });
     }
+
+    requestAnimationFrame(() => map.invalidateSize());
   }, [stations, userLocation, selectedStationId]);
 
   return (
     <div className="w-full h-full min-h-[400px] lg:min-h-[600px] rounded-2xl overflow-hidden glass-card relative border border-slate-800">
       <div ref={mapContainerRef} className="w-full h-full min-h-[400px] lg:min-h-[600px]" />
+      {stations.length === 0 && (
+        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-slate-950/70 px-6 text-center pointer-events-none">
+          <p className="text-sm font-semibold text-slate-300">No charging stations found</p>
+        </div>
+      )}
     </div>
   );
 };

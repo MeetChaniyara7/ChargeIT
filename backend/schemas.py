@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
@@ -89,7 +89,7 @@ class ChargerCreate(ChargerBase):
 class ChargerResponse(ChargerBase):
     charger_id: UUID
     station_id: UUID
-    connectors: List[ConnectorResponse] = []
+    connectors: List[ConnectorResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -109,7 +109,7 @@ class StationResponse(StationBase):
     station_id: UUID
     operator_id: Optional[UUID] = None
     created_at: Optional[datetime] = None
-    chargers: List[ChargerResponse] = []
+    chargers: List[ChargerResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

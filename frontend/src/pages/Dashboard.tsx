@@ -18,61 +18,79 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 };
 
-// Seed dataset fallback if backend API is unreachable or geolocation is pending
-const MOCK_SEED_STATIONS: StationData[] = [
-  {
-    station_id: 'st-01',
-    name: 'VoltPulse Supercharge Hub - Downtown',
-    address: '101 Electric Ave, Downtown',
-    city: 'San Francisco',
-    latitude: 37.7749,
-    longitude: -122.4194,
-    total_chargers: 8,
-    available_chargers: 6,
-    price_per_kwh: 0.28,
-    connector_types: ['CCS2', 'Type 2', 'CHAdeMO'],
-  },
-  {
-    station_id: 'st-02',
-    name: 'EcoCharge Plaza - Tech Park',
-    address: '450 Innovation Blvd, Financial District',
-    city: 'San Francisco',
-    latitude: 37.7886,
-    longitude: -122.4014,
-    total_chargers: 6,
-    available_chargers: 4,
-    price_per_kwh: 0.24,
-    connector_types: ['CCS2', 'Type 2'],
-  },
-  {
-    station_id: 'st-03',
-    name: 'GreenDrive Hub - Embarcadero',
-    address: '789 Waterfront Way, Embarcadero',
-    city: 'San Francisco',
-    latitude: 37.7952,
-    longitude: -122.3934,
-    total_chargers: 4,
-    available_chargers: 1,
-    price_per_kwh: 0.32,
-    connector_types: ['CCS2', 'CHAdeMO'],
-  },
-  {
-    station_id: 'st-04',
-    name: 'VoltPulse Express - SOMA Station',
-    address: '88 Howard St, SOMA',
-    city: 'San Francisco',
-    latitude: 37.7825,
-    longitude: -122.3971,
-    total_chargers: 10,
-    available_chargers: 8,
-    price_per_kwh: 0.26,
-    connector_types: ['CCS2', 'Type 2'],
-  },
-];
+interface ApiConnector {
+  connector_type: string;
+  price_per_kwh: number;
+  status: string;
+}
+
+interface ApiCharger {
+  charger_id: string;
+  status: string;
+  connectors: ApiConnector[];
+}
+
+interface ApiStation {
+  station_id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  chargers: ApiCharger[];
+}
+
+const isValidCoordinate = (latitude: number, longitude: number): boolean =>
+  Number.isFinite(latitude) && Number.isFinite(longitude) &&
+  latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+
+const isApiStation = (item: unknown): item is ApiStation => {
+  if (typeof item !== 'object' || item === null) return false;
+  const station = item as Partial<ApiStation>;
+  return typeof station.station_id === 'string' &&
+    typeof station.name === 'string' &&
+    typeof station.address === 'string' &&
+    typeof station.latitude === 'number' &&
+    typeof station.longitude === 'number' &&
+    Array.isArray(station.chargers);
+};
+
+const mapApiStation = (item: ApiStation): StationData | null => {
+  if (!isValidCoordinate(item.latitude, item.longitude)) return null;
+
+  const chargers = Array.isArray(item.chargers) ? item.chargers : [];
+  const connectors = chargers.flatMap((charger) =>
+    Array.isArray(charger.connectors) ? charger.connectors : []
+  );
+  const availableConnectors = connectors.filter((connector) => connector.status === 'AVAILABLE');
+  const prices = availableConnectors
+    .map((connector) => connector.price_per_kwh)
+    .filter((price) => Number.isFinite(price));
+  const statusCounts = chargers.reduce<Record<string, number>>((counts, charger) => {
+    counts[charger.status] = (counts[charger.status] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  return {
+    station_id: String(item.station_id),
+    name: item.name,
+    address: item.address,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    total_chargers: chargers.length,
+    available_chargers: chargers.filter((charger) => charger.status === 'AVAILABLE').length,
+    price_per_kwh: prices.length > 0 ? Math.min(...prices) : undefined,
+    connector_types: [...new Set(connectors.map((connector) => connector.connector_type))],
+    charger_status_summary: Object.entries(statusCounts)
+      .map(([status, count]) => `${count} ${status.toLowerCase()}`)
+      .join(', '),
+  };
+};
 
 export const Dashboard: React.FC = () => {
   const [stations, setStations] = useState<StationData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
@@ -107,43 +125,44 @@ export const Dashboard: React.FC = () => {
     requestLocation();
   }, []);
 
-  // 2. Fetch Stations from FastAPI Backend (or fallback to seed dataset)
+  // 2. Fetch stations from the FastAPI backend.
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchStations = async () => {
+      setLoading(true);
+      setFetchError(null);
       try {
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-        const res = await fetch(`${backendUrl}/api/stations`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const mapped: StationData[] = data.map((item: any) => ({
-              station_id: item.station_id,
-              name: item.name,
-              address: item.address,
-              city: item.address?.split(',')[1]?.trim() || 'Local Area',
-              latitude: item.latitude,
-              longitude: item.longitude,
-              total_chargers: item.chargers?.length || 4,
-              available_chargers: item.chargers?.filter((c: any) => c.status === 'AVAILABLE').length || 3,
-              price_per_kwh: item.chargers?.[0]?.connectors?.[0]?.price_per_kwh || 0.28,
-              connector_types: item.chargers?.flatMap((c: any) => c.connectors?.map((conn: any) => conn.connector_type)) || ['CCS2', 'Type 2'],
-            }));
-            setStations(mapped);
-          } else {
-            setStations(MOCK_SEED_STATIONS);
-          }
-        } else {
-          setStations(MOCK_SEED_STATIONS);
+        const response = await fetch(`${backendUrl}/api/stations`, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Station service returned HTTP ${response.status}`);
         }
+
+        const data: unknown = await response.json();
+        if (!Array.isArray(data)) throw new Error('Station service returned an invalid response');
+
+        const mapped = data
+          .filter(isApiStation)
+          .map(mapApiStation)
+          .filter((station): station is StationData => station !== null);
+        const uniqueStations = [...new globalThis.Map<string, StationData>(
+          mapped.map((station) => [station.station_id, station])
+        ).values()];
+
+        setStations(uniqueStations);
       } catch (err) {
-        setStations(MOCK_SEED_STATIONS);
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setStations([]);
+        setFetchError(err instanceof Error ? err.message : 'Unable to load charging stations');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     fetchStations();
-  }, []);
+    return () => controller.abort();
+  }, [retryToken]);
 
   // 3. Compute Distances and Sort by Proximity
   const processedStations = stations.map((st) => {
@@ -270,11 +289,23 @@ export const Dashboard: React.FC = () => {
                 <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
                 <p className="text-xs font-medium text-slate-400">Loading EV charging station network...</p>
               </div>
+            ) : fetchError ? (
+              <div className="min-h-[350px] glass-card rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-3">
+                <AlertCircle className="w-10 h-10 text-rose-400" />
+                <h3 className="text-base font-bold text-white">Unable to Load Charging Stations</h3>
+                <p className="text-xs text-slate-400 max-w-sm">{fetchError}</p>
+                <button
+                  onClick={() => setRetryToken((token) => token + 1)}
+                  className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-semibold shadow-md cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
             ) : filteredStations.length === 0 ? (
               /* Empty State */
               <div className="min-h-[350px] glass-card rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-3">
                 <MapPin className="w-10 h-10 text-slate-600" />
-                <h3 className="text-base font-bold text-white">No Charging Stations Found</h3>
+                <h3 className="text-base font-bold text-white">No charging stations found</h3>
                 <p className="text-xs text-slate-400 max-w-sm">
                   We couldn't find any EV stations matching "{searchQuery}". Try clearing your search or typing a different city.
                 </p>
