@@ -1,29 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { CONNECTOR_LABELS, formatINR } from '@chargespot/shared';
-import type { ConnectorType } from '@chargespot/shared';
-import { availabilityFor, buttonClasses } from '../../components/ui';
+import { availabilityFor, cx } from '../../components/ui';
 import type { Availability } from '../../components/ui';
-import type { StationData } from './StationCard';
+import type { ExploreView } from './exploreView';
+import type { LatLng, MapBounds, MapFocus, PinSource } from './types';
 
-const escapeHtml = (value: string): string =>
-  value.replace(/[&<>'"]/g, (character) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;',
-  } as Record<string, string>)[character] ?? character);
-
-interface StationMapProps {
-  stations: StationData[];
-  userLocation: { lat: number; lng: number } | null;
-  selectedStationId: string | null;
-  onSelectStation: (stationId: string) => void;
-  onReserveClick: (stationId: string) => void;
-}
-
-// Pin colour by availability: the same meaning as the status badges everywhere else.
+// Pin colour by availability: the same rule and colours as the status badges.
 const PIN_COLOR: Record<Availability, string> = {
   free: 'bg-primary',
   few: 'bg-warning',
@@ -31,174 +13,196 @@ const PIN_COLOR: Record<Availability, string> = {
   offline: 'bg-muted',
 };
 
-const AVAILABILITY_TEXT: Record<Availability, string> = {
-  free: 'text-primary',
-  few: 'text-warning',
-  busy: 'text-danger',
-  offline: 'text-muted',
-};
+const pinLabel = (s: PinSource): string =>
+  s.charger_total > 0 ? `${s.name}, ${s.charger_free} of ${s.charger_total} chargers free` : `${s.name}, no chargers listed`;
 
-const BOLT = '<path d="M13.2 2 5 13.5h5.3L9.4 22 19 9.8h-5.6z"/>';
-
-/** A teardrop pin with a bolt, coloured by availability and larger when selected. */
-const pinHtml = (availability: Availability, selected: boolean): string => {
-  const size = selected ? 'size-10 ring-4 ring-info/40' : 'size-8';
+/** A teardrop pin showing how many chargers are free; the selected pin is bigger with a ring. */
+const pinHtml = (s: PinSource, selected: boolean): string => {
+  const availability = availabilityFor(s.charger_free, s.charger_total);
+  const size = selected ? 'size-11 ring-4 ring-info/50' : 'size-9';
+  const count = s.charger_total > 0 ? String(s.charger_free) : '–';
   return `
     <div class="${PIN_COLOR[availability]} ${size} flex rotate-[-45deg] items-center justify-center rounded-[50%_50%_50%_0] border-2 border-white shadow-e2">
-      <svg viewBox="0 0 24 24" class="size-4 rotate-45 fill-on-primary" aria-hidden="true">${BOLT}</svg>
+      <span class="num rotate-45 text-sm font-bold text-on-primary">${count}</span>
     </div>`;
 };
 
-const userMarkerHtml = `
+const USER_MARKER_HTML = `
   <div class="relative size-6">
     <span class="absolute inset-0 animate-ping rounded-full bg-info/40"></span>
     <span class="absolute left-1 top-1 size-4 rounded-full border-[3px] border-white bg-info"></span>
   </div>`;
 
-const popupHtml = (st: StationData): string => {
-  const free = st.available_chargers ?? 0;
-  const total = st.total_chargers ?? 0;
-  const availability = availabilityFor(free, total);
-  const connectors = st.connector_types?.length
-    ? st.connector_types.map((t) => escapeHtml(CONNECTOR_LABELS[t as ConnectorType] ?? t)).join(', ')
-    : 'Unknown';
-  const price = st.price_per_kwh !== undefined ? `${formatINR(st.price_per_kwh)}/kWh` : '—';
+/** What decides how a pin looks. If it hasn't changed, the pin is left alone. */
+const pinKey = (s: PinSource, selected: boolean) => `${s.charger_free}/${s.charger_total}/${selected ? 1 : 0}`;
 
-  return `
-    <div class="w-56 p-3">
-      <h4 class="pr-4 text-sm font-bold text-fg">${escapeHtml(st.name)}</h4>
-      <p class="mt-1 text-xs text-muted">${escapeHtml(st.address || 'Address unknown')}</p>
-      <div class="mt-3 flex items-center justify-between text-sm">
-        <span class="font-bold ${AVAILABILITY_TEXT[availability]}">${total > 0 ? `${free}/${total} free` : 'No chargers'}</span>
-        <span class="num font-bold text-fg">${price}</span>
-      </div>
-      <p class="mt-2 text-xs text-muted">Plugs: ${connectors}</p>
-      ${st.has_estimated_data ? '<p class="mt-2"><span class="rounded-full border border-dotted border-muted px-2 py-0.5 text-xs text-muted">Approximate</span></p>' : ''}
-      <button type="button" data-reserve="${escapeHtml(st.station_id)}" class="${buttonClasses({ size: 'md', fullWidth: true })} mt-3">
-        Reserve slot
-      </button>
-    </div>`;
+const pinIcon = (s: PinSource, selected: boolean) => {
+  const size = selected ? 44 : 36;
+  return L.divIcon({ className: 'station-pin', html: pinHtml(s, selected), iconSize: [size, size], iconAnchor: [size / 2, size] });
 };
 
+interface PinEntry {
+  marker: L.Marker;
+  key: string;
+}
+
+export interface StationMapProps {
+  stations: PinSource[];
+  selectedId: string | null;
+  userLocation: LatLng | null;
+  /** Where the map starts (the last view, or Ahmedabad). Only read when the map is created. */
+  initialView: ExploreView;
+  /** Bump `focus.nonce` to move the map somewhere. */
+  focus: MapFocus | null;
+  /** Called after the map has stopped moving (and once when it is ready). */
+  onViewChange: (bounds: MapBounds, view: ExploreView) => void;
+  onSelect: (stationId: string) => void;
+  className?: string;
+}
+
 export const StationMap: React.FC<StationMapProps> = ({
-  stations,
-  userLocation,
-  selectedStationId,
-  onSelectStation,
-  onReserveClick,
+  stations, selectedId, userLocation, initialView, focus, onViewChange, onSelect, className,
 }) => {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<{ [key: string]: L.Marker }>({});
+  const pinLayerRef = useRef<L.LayerGroup | null>(null);
+  const pinsRef = useRef<Map<string, PinEntry>>(new Map());
   const userMarkerRef = useRef<L.Marker | null>(null);
 
-  // Map events always call the latest handlers without rebuilding the map.
-  const handlers = useRef({ onSelectStation, onReserveClick });
+  // Map events always call the latest handlers, without re-creating the map.
+  const handlers = useRef({ onViewChange, onSelect });
   useEffect(() => {
-    handlers.current = { onSelectStation, onReserveClick };
+    handlers.current = { onViewChange, onSelect };
   });
 
+  // Create the map once.
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    // Initialize Leaflet Map if not already initialized
-    if (!mapRef.current) {
-      const defaultCenter: [number, number] = userLocation
-        ? [userLocation.lat, userLocation.lng]
-        : [37.7749, -122.4194];
-
-      const map = L.map(mapContainerRef.current, {
-        center: defaultCenter,
-        zoom: 12,
-        zoomControl: false,
-      });
-
-      // OpenStreetMap's standard tiles: free, no API key, attribution required.
-      // A CSS filter (.map-tiles-dark in index.css) darkens them to match the UI.
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        className: 'map-tiles-dark',
-        maxZoom: 19,
-      }).addTo(map);
-
-      L.control.zoom({ position: 'topright' }).addTo(map);
-
-      mapRef.current = map;
-      requestAnimationFrame(() => map.invalidateSize());
-    }
-
-    const map = mapRef.current;
-
-    // Clear existing markers
-    Object.values(markersRef.current).forEach((m) => m.remove());
-    markersRef.current = {};
-    userMarkerRef.current?.remove();
-    userMarkerRef.current = null;
-
-    // Your location
-    if (userLocation) {
-      const userIcon = L.divIcon({
-        className: 'station-pin',
-        html: userMarkerHtml,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
-      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, title: 'Your location' })
-        .addTo(map)
-        .bindTooltip('Your location', { permanent: false, direction: 'top' });
-    }
-
-    // Stations
-    stations.forEach((st) => {
-      const isSelected = st.station_id === selectedStationId;
-      const availability = availabilityFor(st.available_chargers ?? 0, st.total_chargers ?? 0);
-      const px = isSelected ? 40 : 32;
-
-      const stationIcon = L.divIcon({
-        className: 'station-pin',
-        html: pinHtml(availability, isSelected),
-        iconSize: [px, px],
-        iconAnchor: [px / 2, px],
-        popupAnchor: [0, -px],
-      });
-
-      const marker = L.marker([st.latitude, st.longitude], { icon: stationIcon, title: st.name }).addTo(map);
-      marker.bindPopup(popupHtml(st), { closeButton: true, minWidth: 224 });
-
-      marker.on('click', () => handlers.current.onSelectStation(st.station_id));
-      marker.on('popupopen', () => {
-        const button = marker.getPopup()?.getElement()?.querySelector<HTMLButtonElement>('[data-reserve]');
-        if (button) button.onclick = () => handlers.current.onReserveClick(st.station_id);
-      });
-
-      markersRef.current[st.station_id] = marker;
+    if (!containerRef.current) return;
+    const map = L.map(containerRef.current, {
+      center: [initialView.center.lat, initialView.center.lng],
+      zoom: initialView.zoom,
+      zoomControl: false,
     });
 
-    // Center map on the selected station, user location, or all station markers.
-    if (selectedStationId && markersRef.current[selectedStationId]) {
-      const st = stations.find((s) => s.station_id === selectedStationId);
-      if (st) {
-        map.setView([st.latitude, st.longitude], 14, { animate: true });
-        markersRef.current[selectedStationId].openPopup();
+    // OpenStreetMap's standard tiles: free, no API key, attribution required.
+    // A CSS filter (.map-tiles-dark in index.css) darkens them to match the UI.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      className: 'map-tiles-dark',
+      maxZoom: 19,
+    }).addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    const report = () => {
+      const b = map.getBounds();
+      const c = map.getCenter();
+      handlers.current.onViewChange(
+        { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() },
+        { center: { lat: c.lat, lng: c.lng }, zoom: map.getZoom() },
+      );
+    };
+    map.on('moveend', report);
+
+    pinLayerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+    const pins = pinsRef.current;
+    // The container may still be getting its size from the layout.
+    requestAnimationFrame(() => {
+      map.invalidateSize();
+      report();
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      pinLayerRef.current = null;
+      pins.clear();
+      userMarkerRef.current = null;
+    };
+    // The starting view is only read once, when the map is created.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the pins in step with the stations: add new ones, remove old ones, and refresh a pin
+  // ONLY when its free count or selected state changed. Nothing else is rebuilt.
+  useEffect(() => {
+    const layer = pinLayerRef.current;
+    if (!layer) return;
+    const pins = pinsRef.current;
+    const seen = new Set<string>();
+
+    for (const station of stations) {
+      const id = station.station_id;
+      const selected = id === selectedId;
+      const key = pinKey(station, selected);
+      seen.add(id);
+
+      const existing = pins.get(id);
+      if (!existing) {
+        const marker = L.marker([station.latitude, station.longitude], {
+          icon: pinIcon(station, selected),
+          title: pinLabel(station),
+          alt: pinLabel(station),
+          zIndexOffset: selected ? 1000 : 0,
+        });
+        marker.on('click', () => handlers.current.onSelect(id));
+        marker.addTo(layer);
+        pins.set(id, { marker, key });
+      } else if (existing.key !== key) {
+        existing.marker.setIcon(pinIcon(station, selected));
+        existing.marker.setZIndexOffset(selected ? 1000 : 0);
+        existing.key = key;
       }
-    } else if (userLocation) {
-      map.setView([userLocation.lat, userLocation.lng], 12, { animate: false });
-    } else if (stations.length > 0) {
-      const bounds = L.latLngBounds(stations.map((station): [number, number] => [station.latitude, station.longitude]));
-      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false });
     }
 
-    requestAnimationFrame(() => map.invalidateSize());
-  }, [stations, userLocation, selectedStationId]);
+    for (const [id, entry] of pins) {
+      if (!seen.has(id)) {
+        layer.removeLayer(entry.marker);
+        pins.delete(id);
+      }
+    }
+  }, [stations, selectedId]);
 
-  return (
-    <div className="relative h-full min-h-[400px] w-full overflow-hidden rounded-card border border-border bg-surface lg:min-h-[600px]">
-      <div ref={mapContainerRef} className="h-full min-h-[400px] w-full lg:min-h-[600px]" />
-      {stations.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-bg/70 px-6 text-center">
-          <p className="text-sm font-bold text-muted">No charging stations to show</p>
-        </div>
-      )}
-    </div>
-  );
+  // The user's own position.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    userMarkerRef.current?.remove();
+    userMarkerRef.current = null;
+    if (userLocation) {
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], {
+        icon: L.divIcon({ className: 'station-pin', html: USER_MARKER_HTML, iconSize: [24, 24], iconAnchor: [12, 12] }),
+        title: 'Your location',
+        interactive: false,
+        keyboard: false,
+      }).addTo(map);
+    }
+  }, [userLocation]);
+
+  // Move the map when asked.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focus) return;
+    if (focus.bbox) {
+      const [south, north, west, east] = focus.bbox; // Nominatim's order: south, north, west, east
+      map.flyToBounds([[south, west], [north, east]], { maxZoom: 15, duration: 1.4, easeLinearity: 0.2 });
+    } else {
+      map.flyTo([focus.center.lat, focus.center.lng], focus.zoom ?? 15, { duration: 1.4, easeLinearity: 0.2 });
+    }
+  }, [focus]);
+
+  // A station picked from the list while off-screen: bring it into view.
+  const selectedStation = stations.find((s) => s.station_id === selectedId);
+  const selectedLat = selectedStation?.latitude;
+  const selectedLng = selectedStation?.longitude;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && selectedLat !== undefined && selectedLng !== undefined && !map.getBounds().contains([selectedLat, selectedLng])) {
+      map.panTo([selectedLat, selectedLng]);
+    }
+  }, [selectedId, selectedLat, selectedLng]);
+
+  // `isolate` gives the map its own stacking context. Leaflet's layers use z-index 400–1000,
+  // which would otherwise cover the search bar and the bottom sheet floating over the map.
+  return <div ref={containerRef} className={cx('isolate h-full w-full', className)} role="application" aria-label="Map of charging stations" />;
 };

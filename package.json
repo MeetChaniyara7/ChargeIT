@@ -15,6 +15,7 @@
     "test:api": "cd backend && python -m pytest",
     "generate:api-types": "npm run generate:api-types --workspace @chargespot/shared",
     "test:db": "python -m pytest database/tests",
-    "db:pipeline": "python -m database.pipeline"
+    "db:pipeline": "python -m database.pipeline",
+    "test:web": "npm run test --workspaces --if-present"
   }
 }

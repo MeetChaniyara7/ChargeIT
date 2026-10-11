@@ -125,3 +125,78 @@ class BookingRules:
 
 
 BOOKING_RULES = BookingRules()
+
+
+@dataclass(frozen=True)
+class RecommendationWeights:
+    """How much each factor counts in the "best station" score. They add up to 1.
+
+    Change a number here to change what "best" means; nothing else needs to change.
+    """
+
+    travel_time: float = 0.30  # nearer in time is better
+    availability: float = 0.30  # more compatible chargers free in the window is better
+    power: float = 0.15  # faster charging is better
+    price: float = 0.10  # cheaper is better
+    rating: float = 0.10  # better rated is better
+    data_quality: float = 0.05  # real data beats estimated data
+
+
+@dataclass(frozen=True)
+class RecommendationRules:
+    """Reference values that turn raw numbers (minutes, kW, rupees) into 0-1 scores."""
+
+    max_results: int = 5
+    candidate_pool: int = 10  # nearest stations (straight line) sent to OSRM for real drive times
+    drive_speed_kmh: float = 25.0  # straight-line fallback speed when OSRM is unreachable
+    slow_travel_minutes: float = 30.0  # a drive this long scores 0 for travel time
+    full_availability_chargers: int = 3  # this many free chargers scores 1 for availability
+    fast_power_kw: float = 120.0  # this power scores 1
+    cheap_price_inr: float = 10.0  # at or below this price scores 1
+    expensive_price_inr: float = 30.0  # at or above this price scores 0
+    unknown_rating_score: float = 0.5  # neutral, so unrated stations are neither rewarded nor punished
+    estimated_data_score: float = 0.5  # data_quality score of a station with estimated values
+    min_duration_minutes: int = 30
+    max_duration_minutes: int = 240
+
+
+@dataclass(frozen=True)
+class ExternalServices:
+    """Free public services (no keys). Limits follow their usage policies."""
+
+    osrm_base_url: str = "https://router.project-osrm.org"
+    osrm_timeout_seconds: float = 3.0
+    osrm_cache_seconds: int = 60
+    nominatim_base_url: str = "https://nominatim.openstreetmap.org"
+    nominatim_min_interval_seconds: float = 1.1  # policy: at most 1 request per second
+    nominatim_cache_days: int = 30
+    nominatim_timeout_seconds: float = 8.0
+    nominatim_max_wait_seconds: float = 5.0  # if the 1-per-second queue is longer than this, answer "busy"
+    # Prefer places inside Gujarat (left,top,right,bottom). A preference only: other states still appear.
+    nominatim_viewbox: str = "68.0,24.8,74.6,20.0"
+    user_agent: str = "ChargeSpot/0.1 (college final-year project)"
+
+
+@dataclass(frozen=True)
+class SearchRules:
+    """The Explore search box: suggestions while typing come only from our own database."""
+
+    min_query_length: int = 2
+    max_query_length: int = 80
+    max_stations: int = 5
+    max_operators: int = 3
+    max_cities: int = 3
+    # pg_trgm word similarity (0-1) a name needs to count as a match when it does not
+    # contain the typed text. "tata powr" vs "Tata Power" scores about 0.8.
+    match_similarity: float = 0.5
+    # A close-but-not-exact match at least this similar becomes "Did you mean ...?".
+    did_you_mean_similarity: float = 0.5
+    # "cheap" in a search means at most this price per kWh. Mirrored in
+    # frontend/shared/src/constants.ts (CHEAP_MAX_PRICE_INR).
+    cheap_max_price_inr: float = 15.0
+
+
+RECOMMENDATION_WEIGHTS = RecommendationWeights()
+RECOMMENDATION_RULES = RecommendationRules()
+EXTERNAL_SERVICES = ExternalServices()
+SEARCH_RULES = SearchRules()

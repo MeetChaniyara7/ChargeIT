@@ -164,11 +164,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Stations */
-        get: operations["list_stations_api_stations_get"];
+        /** Search Stations */
+        get: operations["search_stations_api_stations_get"];
         put?: never;
         /** Create Station */
         post: operations["create_station_api_stations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stations/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Stations
+         * @description How many stations are on the map (shown on the landing page).
+         */
+        get: operations["count_stations_api_stations_count_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -184,6 +204,74 @@ export interface paths {
         };
         /** Get Station */
         get: operations["get_station_api_stations__station_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stations/{station_id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Availability */
+        get: operations["get_availability_api_stations__station_id__availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recommendations */
+        get: operations["get_recommendations_api_recommendations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/geocode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Geocode */
+        get: operations["geocode_api_geocode_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest */
+        get: operations["suggest_api_search_suggest_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -213,8 +301,64 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** ChargerResponse */
-        ChargerResponse: {
+        /**
+         * AreaSuggestion
+         * @description An operator or a city, with how many visible stations it has.
+         */
+        AreaSuggestion: {
+            /** Name */
+            name: string;
+            /** Station Count */
+            station_count: number;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Bbox */
+            bbox: number[];
+        };
+        /** AvailabilityBlock */
+        AvailabilityBlock: {
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "FREE" | "BOOKED" | "HELD" | "PAST" | "OUT_OF_SERVICE";
+        };
+        /** ChargerAvailability */
+        ChargerAvailability: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Label */
+            label: string;
+            /** Connector Type */
+            connector_type: string;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+            /** Status */
+            status: string;
+            /** Is Estimated */
+            is_estimated: boolean;
+            /** Blocks */
+            blocks: components["schemas"]["AvailabilityBlock"][];
+        };
+        /** ChargerDetail */
+        ChargerDetail: {
             /**
              * Charger Id
              * Format: uuid
@@ -232,10 +376,23 @@ export interface components {
             price_per_kwh?: number | null;
             /** Status */
             status: string;
+            /** Free Now */
+            free_now: boolean;
             /** Data Source */
             data_source: string;
             /** Is Estimated */
             is_estimated: boolean;
+            /** Estimated Fields */
+            estimated_fields?: string[];
+        };
+        /** GeocodeResponse */
+        GeocodeResponse: {
+            /** Query */
+            query: string;
+            /** Places */
+            places: components["schemas"]["Place"][];
+            /** Cached */
+            cached: boolean;
         };
         /** GoogleLoginRequest */
         GoogleLoginRequest: {
@@ -246,6 +403,84 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Place */
+        Place: {
+            /** Name */
+            name: string;
+            /** Lat */
+            lat: number;
+            /** Lng */
+            lng: number;
+            /** Bbox */
+            bbox?: [
+                number,
+                number,
+                number,
+                number
+            ] | null;
+            /** Kind */
+            kind?: string | null;
+        };
+        /** Recommendation */
+        Recommendation: {
+            station: components["schemas"]["StationSummary"];
+            /** Score */
+            score: number;
+            /** Reason */
+            reason: string;
+            /** Free Compatible */
+            free_compatible: number;
+            /** Travel Minutes */
+            travel_minutes: number;
+            /** Travel Is Routed */
+            travel_is_routed: boolean;
+            /** Distance Km */
+            distance_km: number;
+        };
+        /** RecommendationResponse */
+        RecommendationResponse: {
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /** Results */
+            results: components["schemas"]["Recommendation"][];
+        };
+        /** StationAvailability */
+        StationAvailability: {
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Slot Minutes */
+            slot_minutes: number;
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
+            /** Chargers */
+            chargers: components["schemas"]["ChargerAvailability"][];
+        };
+        /** StationCount */
+        StationCount: {
+            /** Count */
+            count: number;
         };
         /**
          * StationCreate
@@ -268,8 +503,8 @@ export interface components {
             /** Operator Id */
             operator_id?: string | null;
         };
-        /** StationResponse */
-        StationResponse: {
+        /** StationDetail */
+        StationDetail: {
             /**
              * Station Id
              * Format: uuid
@@ -291,21 +526,130 @@ export interface components {
             vehicle_category: string;
             /** Opening Hours */
             opening_hours?: string | null;
+            /** Is Open Now */
+            is_open_now?: boolean | null;
             /** Rating */
             rating?: number | null;
+            /**
+             * Rating Is Estimated
+             * @default false
+             */
+            rating_is_estimated: boolean;
             /**
              * Rating Count
              * @default 0
              */
             rating_count: number;
-            /** Is Active */
-            is_active: boolean;
             /** Data Source */
             data_source: string;
             /** Has Estimated Data */
             has_estimated_data: boolean;
+            /** Charger Total */
+            charger_total: number;
+            /** Charger Free */
+            charger_free: number;
+            /** Connector Types */
+            connector_types: (("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER") | string)[];
+            /** Min Power Kw */
+            min_power_kw?: number | null;
+            /** Max Power Kw */
+            max_power_kw?: number | null;
+            /** Min Price Per Kwh */
+            min_price_per_kwh?: number | null;
+            /** Distance Km */
+            distance_km?: number | null;
+            /** Eta Minutes Estimate */
+            eta_minutes_estimate?: number | null;
             /** Chargers */
-            chargers?: components["schemas"]["ChargerResponse"][];
+            chargers: components["schemas"]["ChargerDetail"][];
+        };
+        /** StationSearchResponse */
+        StationSearchResponse: {
+            /** Stations */
+            stations: components["schemas"]["StationSummary"][];
+            /** Count */
+            count: number;
+            /** Limit */
+            limit: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * StationSummary
+         * @description A station with a live summary of its chargers: what the map and list show.
+         *
+         *     When a connector or power filter is used, the charger_* and power/price fields describe
+         *     only the chargers that match the filter (a driver with a CCS2 car sees CCS2 chargers).
+         */
+        StationSummary: {
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address: string;
+            /** City */
+            city?: string | null;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Operator Name */
+            operator_name?: string | null;
+            /** Vehicle Category */
+            vehicle_category: string;
+            /** Opening Hours */
+            opening_hours?: string | null;
+            /** Is Open Now */
+            is_open_now?: boolean | null;
+            /** Rating */
+            rating?: number | null;
+            /**
+             * Rating Is Estimated
+             * @default false
+             */
+            rating_is_estimated: boolean;
+            /**
+             * Rating Count
+             * @default 0
+             */
+            rating_count: number;
+            /** Data Source */
+            data_source: string;
+            /** Has Estimated Data */
+            has_estimated_data: boolean;
+            /** Charger Total */
+            charger_total: number;
+            /** Charger Free */
+            charger_free: number;
+            /** Connector Types */
+            connector_types: (("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER") | string)[];
+            /** Min Power Kw */
+            min_power_kw?: number | null;
+            /** Max Power Kw */
+            max_power_kw?: number | null;
+            /** Min Price Per Kwh */
+            min_price_per_kwh?: number | null;
+            /** Distance Km */
+            distance_km?: number | null;
+            /** Eta Minutes Estimate */
+            eta_minutes_estimate?: number | null;
+        };
+        /** SuggestResponse */
+        SuggestResponse: {
+            /** Query */
+            query: string;
+            /** Stations */
+            stations: components["schemas"]["StationSummary"][];
+            /** Operators */
+            operators: components["schemas"]["AreaSuggestion"][];
+            /** Cities */
+            cities: components["schemas"]["AreaSuggestion"][];
+            /** Did You Mean */
+            did_you_mean?: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -639,9 +983,28 @@ export interface operations {
             };
         };
     };
-    list_stations_api_stations_get: {
+    search_stations_api_stations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Map area: min_lng,min_lat,max_lng,max_lat */
+                bbox?: string | null;
+                /** @description Search point: sorts by distance */
+                lat?: number | null;
+                lng?: number | null;
+                /** @description With lat/lng: only stations this near */
+                radius_km?: number | null;
+                /** @description Plug types; a station matches if it has any */
+                connector?: ("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER")[];
+                /** @description Only chargers at least this fast */
+                min_power_kw?: number | null;
+                /** @description Only chargers at most this price per kWh (INR) */
+                max_price?: number | null;
+                /** @description Only this operator's stations */
+                operator?: string | null;
+                /** @description Hide stations known to be closed right now */
+                open_now?: boolean;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -654,7 +1017,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StationResponse"][];
+                    "application/json": components["schemas"]["StationSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -678,7 +1050,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StationResponse"];
+                    "application/json": components["schemas"]["StationDetail"];
                 };
             };
             /** @description Validation Error */
@@ -692,9 +1064,32 @@ export interface operations {
             };
         };
     };
-    get_station_api_stations__station_id__get: {
+    count_stations_api_stations_count_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationCount"];
+                };
+            };
+        };
+    };
+    get_station_api_stations__station_id__get: {
+        parameters: {
+            query?: {
+                lat?: number | null;
+                lng?: number | null;
+            };
             header?: never;
             path: {
                 station_id: string;
@@ -709,7 +1104,147 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StationResponse"];
+                    "application/json": components["schemas"]["StationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_availability_api_stations__station_id__availability_get: {
+        parameters: {
+            query?: {
+                /** @description India-time day, YYYY-MM-DD (default: today) */
+                date?: string | null;
+            };
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationAvailability"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recommendations_api_recommendations_get: {
+        parameters: {
+            query: {
+                /** @description Where the driver is (or the map centre) */
+                lat: number;
+                lng: number;
+                /** @description Plug types the car can use; empty = any */
+                connector?: ("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER")[];
+                /** @description When charging should start (default: now) */
+                start?: string | null;
+                /** @description Minutes, in steps of 30 */
+                duration?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    geocode_api_geocode_get: {
+        parameters: {
+            query: {
+                /** @description A place, e.g. 'Bopal, Ahmedabad' */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeocodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_api_search_suggest_get: {
+        parameters: {
+            query: {
+                /** @description What the user typed, e.g. 'tata power' */
+                q: string;
+                /** @description With lng: nearer stations rank higher */
+                lat?: number | null;
+                lng?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestResponse"];
                 };
             };
             /** @description Validation Error */

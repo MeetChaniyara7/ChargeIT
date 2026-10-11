@@ -43,6 +43,16 @@ export const CONNECTOR_LABELS: Record<ConnectorType, string> = {
   OTHER: 'Other',
 };
 
+/** Plugs that charge with direct current (DC) or alternating current (AC), for "dc" / "ac" in a search. */
+export const DC_CONNECTORS = ['CCS2', 'CHADEMO', 'BHARAT_DC001'] as const satisfies readonly ConnectorType[];
+export const AC_CONNECTORS = ['TYPE2', 'BHARAT_AC001', 'TYPE1'] as const satisfies readonly ConnectorType[];
+
+/** "Fast" chargers deliver at least this much power. */
+export const FAST_POWER_KW = 50;
+
+/** "cheap" in a search means at most this price per kWh. Mirrors SEARCH_RULES.cheap_max_price_inr in backend/app/config.py. */
+export const CHEAP_MAX_PRICE_INR = 15;
+
 /** BOOKING = started with an OTP, WALK_IN = kiosk QR, EXTERNAL = operator's own app/card. */
 export const SESSION_SOURCES = ['BOOKING', 'WALK_IN', 'EXTERNAL'] as const;
 export type SessionSource = (typeof SESSION_SOURCES)[number];

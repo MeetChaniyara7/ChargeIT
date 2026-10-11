@@ -368,7 +368,20 @@ Phase 2; summarise and STOP. Wait for my approval before Phase 3.
 **3.9 Tests**
 - [ ] API tests for bbox and radius search, connector filter, and availability with seeded bookings (booked, held, expired-hold, past).
 
+**3.10 Smart search on Explore** (added after the first Phase 3 review; design in [architecture.md](architecture.md) section 12.2)
+- [ ] Fix: the search bar was hidden under the map (Leaflet's layers sit at z-index 400–1000). The map's own element now isolates its layers.
+- [ ] Migration `010_search.sql`: the `pg_trgm` extension plus trigram indexes on station name, station city and operator name.
+- [ ] `parseSearch(text)` in `@chargespot/shared`: pure functions that read plug types, power, "fast", opening hours, price, "near me" and "near/in <place>", and leave unknown words in the text. Tested with Node's built-in test runner (`npm run test:web`).
+- [ ] `GET /api/search/suggest?q=&lat=&lng=` (login required): the top 5 stations (by name or address), 3 operators and 3 cities, plus "did you mean". Our database only, with a fixed number of queries.
+- [ ] `/api/stations` gains `operator` and `max_price` filters. The page address gains `operator`, `min_kw` and `max_price`.
+- [ ] Web: an accessible combobox with "Understood" chips, Stations / Operators / Cities / Places / Recent sections, example searches and quick chips. It fills the screen on phones. Places are looked up on Enter only. "Show without <filter>" appears when the filters leave no stations.
+
 ### Done when
+- [ ] The search bar is visible over the map on desktop and phone.
+- [ ] "fast ccs2 near Bopal" shows CCS2 50 kW+ stations around Bopal, with three "Understood" chips.
+- [ ] "tata powr" suggests Tata Power.
+- [ ] Typing never calls Nominatim; pressing Enter on a place does, and the result is cached.
+- [ ] Filters survive a page refresh and Back; recent searches appear.
 - [ ] The map loads stations only for the visible area, starting in Ahmedabad.
 - [ ] Searching "Bopal" moves the map to Bopal; searching a station name finds it.
 - [ ] No card shows invented numbers; synthetic data shows the badge; prices are in ₹.

@@ -19,7 +19,7 @@ This document records **what we are building and why**. It is the reference for 
 9. [The station kiosk](#9-the-station-kiosk)
 10. [Background jobs](#10-background-jobs)
 11. [Live updates (realtime)](#11-live-updates-realtime)
-12. ["Best station" recommendations](#12-best-station-recommendations)
+12. [Finding stations: recommendations and smart search](#12-finding-stations-recommendations-and-smart-search)
 13. [Station data strategy](#13-station-data-strategy)
 14. [Security](#14-security)
 15. [Configuration values](#15-configuration-values)
@@ -50,7 +50,7 @@ flowchart LR
     end
 
     subgraph Supabase["Supabase (free tier)"]
-        DB[(PostgreSQL<br/>+ btree_gist + pg_cron)]
+        DB[(PostgreSQL<br/>+ btree_gist + pg_cron + pg_trgm)]
         RT[Realtime]
     end
 
@@ -104,6 +104,7 @@ Everything is **free**. No paid service is used.
 | Maps | Leaflet with **OpenStreetMap** tiles | Free with attribution and no key. A CSS filter darkens them to match the UI. (CARTO basemaps now require an API key, so we don't use them.) |
 | Routing / travel time | OSRM public server, falling back to straight-line distance | Free. One request per recommendation. |
 | Address search | Nominatim (OpenStreetMap), called through the API with a cache | Free. Its usage policy forbids search-as-you-type, so we geocode only when the user presses Search. |
+| Search suggestions | PostgreSQL **`pg_trgm`** (fuzzy text matching, built into Supabase) | Free and inside our own database. Suggestions while typing come only from our data, so typos like "tata powr" still match without calling any outside service. |
 | Shared front-end types | TypeScript types generated from the API's OpenAPI spec (`openapi-typescript`) | The two apps always match the API without hand-copying types. |
 | Kiosk QR codes | `qrcode.react` | Tiny, MIT-licensed. Draws the walk-in payment QR. |
 | Hosting | Vercel (both front ends), Render (API) | Free tiers. |
@@ -153,6 +154,7 @@ backend/
     stations/                    station search by map area or radius
     availability/                30-minute slot grid per charger
     recommendations/             scoring.py (pure functions), osrm.py
+    search/                      search suggestions (stations, operators, cities) via pg_trgm
     bookings/                    state_machine.py, otp.py, refunds.py, service.py, repository.py
     payments/                    Razorpay orders, signature check, webhook, refunds
     charging/                    sessions, simulated energy meter, billing
@@ -569,7 +571,9 @@ When a booking or charger changes, a database trigger sends a small **"something
 
 ---
 
-## 12. "Best station" recommendations
+## 12. Finding stations: recommendations and smart search
+
+### 12.1 "Best station" recommendations
 
 `GET /recommendations?lat&lng&connector&start&duration`
 
@@ -589,6 +593,39 @@ When a booking or charger changes, a database trigger sends a small **"something
 4. Return the top results with a short **reason**, for example *"2 CCS2 chargers free · 1.2 km · 60 kW"*.
 
 The scoring code is **pure functions** with no database or network access, so it has its own unit tests.
+
+### 12.2 Smart search (Explore)
+
+> Built in Phase 3 (task 3.10). Migration `010_search.sql` enables `pg_trgm` and adds the indexes.
+
+One search box on Explore understands station names, operators, plug types, power, opening hours, price, "near me" and places, alone or combined, for example *"fast ccs2 near Bopal"*.
+
+| Typed | Understood as | Filter in the page address |
+|---|---|---|
+| `Bopal`, `near Bopal`, `in Gandhinagar` | a place: the map moves there | (map view) |
+| `Tata Power` | an operator: only their stations | `operator` |
+| `ccs2`, `type 2`, `chademo`, `bharat dc` | plug type | `connector` (repeatable) |
+| `60kw`, `fast`, `dc` | minimum power (`fast` = 50 kW+) | `fast` / `min_kw` |
+| `open now`, `24 hours` | opening hours | `open` |
+| `cheap`, `under 15` | maximum price per kWh (₹); `cheap` = ₹15 | `max_price` |
+| `dc`, `ac` | the DC plugs (CCS2, CHAdeMO, Bharat DC-001) or the AC plugs | `connector` |
+| `near me`, `nearby` | the user's location | (geolocation) |
+
+**How it works:**
+
+1. **The browser reads the query.** A pure function, `parseSearch(text)` in `@chargespot/shared` (unit-tested with Node's built-in test runner), picks out the words it knows (using the shared connector lists, so nothing drifts from the database). Whatever is left over is the name or place part. Unknown words are never guessed into filters.
+2. **Suggestions while typing come only from our database.** `GET /api/search/suggest?q=&lat=&lng=` (login required) returns the top stations (matched by name, or by address so "Bopal" finds stations on Bopal roads), operators and cities, each operator and city with its station count and map area. The browser waits 250 ms after the user stops typing. Matching uses **`pg_trgm`** word similarity with trigram indexes on station name, operator and city. Ranking puts a name that starts with the text first, then a name that contains it, then an address that contains it, then similar spellings; ties go to the nearest station. A fixed number of queries per request (tested). Only four-wheeler stations are included. A close-but-not-exact match returns a **"Did you mean …?"** suggestion. Thresholds live in `config.py`.
+3. **Places only on Enter.** Nominatim is called **only when the search is submitted**, through `/api/geocode`, and the result is cached (section 16). It is never called while typing.
+4. **Results follow the query.** The filters that were picked out become selected chips and are saved in the page address, so a search can be shared and Back works. The map moves to the station, operator area, city or place, and the list updates.
+
+**Interface:**
+
+- **Desktop:** a dropdown under the search bar over the map, with these sections: **Understood** (the chips that were picked out, each removable), **Stations** (with live "2/3 free" badges), **Operators**, **Cities**, **Places** ("press Enter"), and **Recent**.
+- **Phone:** tapping the box opens a full-screen search sheet with the same sections and large touch targets. Picking a result returns to the map with the results in the bottom sheet.
+- **Empty box:** example searches and quick chips (Near me · Fast · Open now · CCS2).
+- **No results:** names the filter that hides the most stations and offers one tap to remove it.
+- **Recent searches:** the last 5, stored only in that browser, never sent to the API.
+- **Accessibility:** the dropdown is an ARIA combobox (arrow keys, Enter, Esc) that announces how many results there are.
 
 ---
 
@@ -654,6 +691,7 @@ All of these live in `backend/app/config.py`, so they can be changed without tou
 | Kiosk alert threshold | 20 wrong tries / 10 min |
 | Kiosk idle reset | 30 s |
 | Recommendation radius | 15 km |
+| Search suggestions | wait 250 ms after typing; top 5 stations, 3 operators, 3 cities; fuzzy-match thresholds in `config.py` |
 | Duplicate-station distance | ~50 m |
 | Display time zone | Asia/Kolkata |
 

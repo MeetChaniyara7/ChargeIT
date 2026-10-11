@@ -31,7 +31,7 @@ export function formatIST(value: Date | string, options: Intl.DateTimeFormatOpti
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The IST calendar date of an instant as "YYYY-MM-DD" (en-CA formats dates that way). */
-function istDateKey(date: Date): string {
+export function istDateKey(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: DISPLAY_TIME_ZONE }).format(date);
 }
 

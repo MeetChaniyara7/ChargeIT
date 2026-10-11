@@ -22,7 +22,7 @@ API (from `backend`, with `.venv` active: `.venv\Scripts\activate` on Windows):
 ```bash
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000   # docs at http://localhost:8000/docs
-python -m pytest                            # tests need no database
+python -m pytest                            # most tests need no database; those marked needs_db use TEST_DATABASE_URL (a throwaway local db) and are skipped without it
 python -m pytest tests/test_auth.py::test_token_round_trip   # single test
 ```
 
@@ -33,6 +33,7 @@ npm install
 npm run dev:web              # http://localhost:5173
 npm run build                # tsc -b && vite build for every workspace (this is the type check)
 npm run lint                 # oxlint (config in frontend/user-web/.oxlintrc.json)
+npm run test:web             # shared unit tests (search parser), Node's built-in test runner; no extra packages
 npm run generate:api-types   # API must be running; regenerates frontend/shared/src/api-types.ts
 ```
 
@@ -56,7 +57,7 @@ python -m pytest database/tests          # needs TEST_DATABASE_URL (a throwaway 
 
 **Database:** PostgreSQL on Supabase. The schema is defined ONLY by numbered SQL files in `database/migrations/`; SQLAlchemy models mirror it and never create tables. Never edit an applied migration; add a new numbered file (and enable row-level security on any new table; a test checks this). Key rules live in the database itself: the `bookings_no_double_booking` exclusion constraint (catch SQLSTATE 23P01; on 40P01 deadlock retry once) and the `allowed_booking_transitions` table plus trigger (pass who/why via `set_config('chargespot.actor'/'chargespot.reason', ..., true)`). One charger row = one bookable plug. `data_source`/`estimated_fields` mark generated values; the app shows only `vehicle_category = 'FOUR_WHEELER'` stations.
 
-**Web app:** feature folders under `src/features/` (`auth`, `stations`, `home`, `profile`, `bookings`, `charging`, `dev`), routes in `src/app/App.tsx`. Design: `docs/ui-flow.md` ("Midnight Charge"); colours, radii, shadows and fonts come ONLY from `frontend/shared/src/styles/tokens.css` (Tailwind classes like `bg-surface`, `text-muted`, `border-border`, `bg-primary`; never raw palette classes like `slate-900`). Build screens from `src/components/ui` (Button, Card, Field, Sheet, Toast, StatusBadge, Money, DateTime, ConnectorIcon, ApproximateTag, Skeleton, EmptyState ...; keep hooks/helpers out of component files so fast-refresh lint stays quiet). Glass/blur is allowed over the map only. Layouts: `components/layout/PublicLayout` (landing, sign in/up) and `AppLayout` (top bar on desktop, bottom tabs on phone). `/dev/ui` is a dev-only style guide. After sign-in, `features/auth/returnTo.ts` sends users back to the page they were heading to. Every API call goes through `src/lib/api.ts` (`apiFetch`), which adds the Bearer token, parses the error format into `ApiError`, and on 401 clears the token and fires `chargespot:unauthorized` (`AuthContext` listens and signs out). The token is in `localStorage['token']`.
+**Web app:** feature folders under `src/features/` (`auth`, `stations`, `home`, `profile`, `bookings`, `charging`, `dev`), routes in `src/app/App.tsx` (`/explore` map + list, `/stations/:stationId` detail with the availability grid). Read API data with `useApiQuery(key, fetcher)` (`src/lib`); Explore filters live in the URL (`useExploreFilters`: connector, fast, min_kw, max_price, operator, open, q); the phone list is a draggable `SnapSheet`. Explore search: `parseSearch` (`@chargespot/shared`, pure) turns typed words into filters, `SearchBox` is the combobox, suggestions come from `GET /api/search/suggest` (pg_trgm, our data only), and Nominatim (`/api/geocode`) is called only on Enter. Design: `docs/ui-flow.md` ("Midnight Charge"); colours, radii, shadows and fonts come ONLY from `frontend/shared/src/styles/tokens.css` (Tailwind classes like `bg-surface`, `text-muted`, `border-border`, `bg-primary`; never raw palette classes like `slate-900`). Build screens from `src/components/ui` (Button, Card, Field, Sheet, Toast, StatusBadge, Money, DateTime, ConnectorIcon, ApproximateTag, Skeleton, EmptyState ...; keep hooks/helpers out of component files so fast-refresh lint stays quiet). Glass/blur is allowed over the map only. Layouts: `components/layout/PublicLayout` (landing, sign in/up) and `AppLayout` (top bar on desktop, bottom tabs on phone). `/dev/ui` is a dev-only style guide. After sign-in, `features/auth/returnTo.ts` sends users back to the page they were heading to. Every API call goes through `src/lib/api.ts` (`apiFetch`), which adds the Bearer token, parses the error format into `ApiError`, and on 401 clears the token and fires `chargespot:unauthorized` (`AuthContext` listens and signs out). The token is in `localStorage['token']`.
 
 ## Rules
 

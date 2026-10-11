@@ -176,8 +176,9 @@ While developing, http://localhost:5173/dev/ui shows every shared UI component i
 ### Build and lint
 
 ```bash
-npm run build   # type-checks and builds every workspace
-npm run lint    # oxlint
+npm run build      # type-checks and builds every workspace
+npm run lint       # oxlint
+npm run test:web   # front-end unit tests (the search parser), using Node's built-in test runner
 ```
 
 ## 6. Shared API types
@@ -194,7 +195,7 @@ This uses `npx openapi-typescript`, so nothing extra needs installing.
 
 1. Terminal 1: `cd backend`, activate the venv, `uvicorn app.main:app --reload --port 8000`
 2. Terminal 2: `npm run dev:web`
-3. Before committing: `npm run build`, `npm run lint`, `python -m pytest` in `backend`, and `python -m pytest database/tests` from the root.
+3. Before committing: `npm run build`, `npm run lint`, `npm run test:web`, `python -m pytest` in `backend`, and `python -m pytest database/tests` from the root.
 
 ## 8. Troubleshooting
 

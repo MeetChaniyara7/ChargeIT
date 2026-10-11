@@ -15,6 +15,10 @@ from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
 from app.features.auth.router import api_router as auth_api_router
 from app.features.auth.router import router as auth_router
+from app.features.availability.router import router as availability_router
+from app.features.geocoding.router import router as geocoding_router
+from app.features.recommendations.router import router as recommendations_router
+from app.features.search.router import router as search_router
 from app.features.stations.router import router as stations_router
 
 
@@ -40,6 +44,10 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(auth_api_router)
     app.include_router(stations_router)
+    app.include_router(availability_router)
+    app.include_router(recommendations_router)
+    app.include_router(geocoding_router)
+    app.include_router(search_router)
 
     @app.get("/health", tags=["Health"])
     def health():

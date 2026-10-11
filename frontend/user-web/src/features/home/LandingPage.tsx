@@ -39,8 +39,8 @@ function useStationCount(): StationCount {
 
   useEffect(() => {
     const controller = new AbortController();
-    apiFetch<unknown[]>('/api/stations', { signal: controller.signal })
-      .then((stations) => setResult(Array.isArray(stations) ? { state: 'ready', count: stations.length } : { state: 'error' }))
+    apiFetch<{ count: number }>('/api/stations/count', { signal: controller.signal })
+      .then(({ count }) => setResult(typeof count === 'number' ? { state: 'ready', count } : { state: 'error' }))
       .catch((err) => {
         if (!(err instanceof DOMException && err.name === 'AbortError')) setResult({ state: 'error' });
       });

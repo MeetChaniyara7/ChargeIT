@@ -20,6 +20,8 @@ export { EmptyState } from './EmptyState';
 export { ToastProvider } from './Toast';
 export { useToast } from './toast-context';
 export { Sheet } from './Sheet';
+export { SnapSheet } from './SnapSheet';
+export type { Snap } from './SnapSheet';
 export { ApproximateTag } from './ApproximateTag';
 export { Money } from './Money';
 export { DateTime } from './DateTime';

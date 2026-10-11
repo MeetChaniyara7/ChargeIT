@@ -1,51 +1,50 @@
 import React from 'react';
-import { MapPin, Navigation, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MapPin, Navigation, Star } from 'lucide-react';
 import {
-  ApproximateTag,
-  availabilityFor,
-  Button,
-  Card,
-  ConnectorIcon,
-  cx,
-  Money,
-  StatusBadge,
+  ApproximateTag, availabilityFor, buttonClasses, Card, ConnectorIcon, cx, Money, StatusBadge,
 } from '../../components/ui';
 import { directionsUrl } from './directions';
+import type { StationSummary } from './types';
 
-export interface StationData {
-  station_id: string;
-  name: string;
-  address: string;
-  city?: string;
-  latitude: number;
-  longitude: number;
-  total_chargers?: number;
-  available_chargers?: number;
-  price_per_kwh?: number;
-  /** Connector type codes, e.g. "CCS2" (ConnectorIcon turns them into labels). */
-  connector_types?: string[];
-  charger_status_summary?: string;
-  distance_km?: number;
-  /** True when some shown values were estimated rather than imported. */
-  has_estimated_data?: boolean;
+/** Trip details from a recommendation: real road time, or an estimate when routing was unavailable. */
+export interface TripInfo {
+  minutes: number;
+  distanceKm: number;
+  routed: boolean;
 }
 
 interface StationCardProps {
-  station: StationData;
-  onSelect?: (stationId: string) => void;
-  onReserveClick?: (stationId: string) => void;
+  station: StationSummary;
   isSelected?: boolean;
+  /** Select this station (and its map pin). A second tap on the selected card opens the station page. */
+  onSelect?: (stationId: string) => void;
+  /** Show the distance and drive time. Off when we only know the map centre, not where the user is. */
+  showDistance?: boolean;
+  /** Why this station was recommended, e.g. "2 CCS2 chargers free · 1.2 km · 60 kW". */
+  reason?: string;
+  trip?: TripInfo;
+  /** Position in the list: later cards fade in a moment after earlier ones. */
+  index?: number;
 }
 
-export const StationCard: React.FC<StationCardProps> = ({ station, onSelect, onReserveClick, isSelected = false }) => {
-  const total = station.total_chargers ?? 0;
-  const available = station.available_chargers ?? 0;
-  const connectors = station.connector_types ?? [];
+const minutesText = (minutes: number, routed: boolean) => `${routed ? '' : '~'}${Math.max(1, Math.round(minutes))} min`;
+
+export const StationCard: React.FC<StationCardProps> = ({ station, isSelected = false, onSelect, showDistance = false, reason, trip, index = 0 }) => {
+  const free = station.charger_free;
+  const total = station.charger_total;
+  const distance = trip ? trip.distanceKm : station.distance_km;
+  const time = trip ? minutesText(trip.minutes, trip.routed) : station.eta_minutes_estimate ? minutesText(station.eta_minutes_estimate, false) : null;
 
   return (
     <Card
+      id={`station-card-${station.station_id}`}
       elevation={isSelected ? 2 : 1}
-      className={cx('cursor-pointer p-4 transition-colors duration-150', isSelected ? 'border-primary' : 'hover:border-field-border')}
+      style={{ '--i': Math.min(index, 8) } as React.CSSProperties}
+      className={cx(
+        'result-enter cursor-pointer p-4 transition-colors duration-150',
+        isSelected ? 'result-flash border-primary' : 'hover:border-field-border',
+      )}
       onClick={() => onSelect?.(station.station_id)}
     >
       <div className="flex items-start justify-between gap-3">
@@ -64,34 +63,36 @@ export const StationCard: React.FC<StationCardProps> = ({ station, onSelect, onR
               {station.name}
             </button>
           </h3>
+          {station.operator_name && <p className="text-sm text-muted">{station.operator_name}</p>}
           <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
             <MapPin className="size-4 shrink-0" aria-hidden="true" />
             <span className="truncate">{station.address || station.city || 'Address unknown'}</span>
-            {station.distance_km !== undefined && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="num shrink-0 font-bold text-info">{station.distance_km.toFixed(1)} km</span>
-              </>
-            )}
           </p>
+          {(showDistance || trip) && distance != null && (
+            <p className="num mt-0.5 text-sm font-bold text-info">
+              {distance.toFixed(1)} km{time && <span className="font-medium"> · {time}</span>}
+            </p>
+          )}
         </div>
         <StatusBadge
           className="shrink-0"
-          status={availabilityFor(available, total)}
-          label={total > 0 ? `${available}/${total} free` : 'No chargers'}
+          status={availabilityFor(free, total)}
+          label={total > 0 ? `${free}/${total} free` : 'No chargers'}
         />
       </div>
+
+      {reason && <p className="mt-2 text-sm font-medium text-primary">{reason}</p>}
 
       <div className="my-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-y border-border py-3">
         <div>
           <p className="text-xs text-muted">From</p>
           <p className="text-base font-bold">
-            <Money value={station.price_per_kwh} perKwh />
+            <Money value={station.min_price_per_kwh} perKwh />
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
-          {connectors.length > 0 ? (
-            connectors.map((type) => <ConnectorIcon key={type} type={type} />)
+          {station.connector_types.length > 0 ? (
+            station.connector_types.map((type) => <ConnectorIcon key={type} type={type} />)
           ) : (
             <span className="text-muted">Plug types unknown</span>
           )}
@@ -99,30 +100,29 @@ export const StationCard: React.FC<StationCardProps> = ({ station, onSelect, onR
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        {station.rating != null && (
+          <span className="num inline-flex items-center gap-1 text-sm" title={`${station.rating_count} ratings`}>
+            <Star className="size-4 fill-warning text-warning" aria-hidden="true" />
+            <span className="font-bold">{station.rating.toFixed(1)}</span>
+          </span>
+        )}
         {station.has_estimated_data && (
           <ApproximateTag reason="Some chargers, power or prices at this station are estimated from typical values for its operator." />
         )}
         <div className="ml-auto flex gap-2">
-          <Button
-            variant="secondary"
-            icon={<Navigation className="size-4" aria-hidden="true" />}
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(directionsUrl(station), '_blank', 'noopener,noreferrer');
-            }}
+          <a
+            href={directionsUrl(station)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={buttonClasses({ variant: 'secondary' })}
           >
+            <Navigation className="size-4" aria-hidden="true" />
             Navigate
-          </Button>
-          <Button
-            disabled={available === 0}
-            icon={<Zap className="size-4" aria-hidden="true" />}
-            onClick={(e) => {
-              e.stopPropagation();
-              onReserveClick?.(station.station_id);
-            }}
-          >
-            Reserve slot
-          </Button>
+          </a>
+          <Link to={`/stations/${station.station_id}`} onClick={(e) => e.stopPropagation()} className={buttonClasses()}>
+            View chargers
+          </Link>
         </div>
       </div>
     </Card>

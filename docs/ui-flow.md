@@ -94,6 +94,34 @@ Landing → Sign in → Explore → Station → Pick slots → Hold & pay → Ti
 ```
 Desktop: list panel on the left (400 px), map on the right.
 
+**Search** (design: [architecture.md](architecture.md) section 12.2). One box understands mixed searches such as *"fast ccs2 near Bopal"*:
+
+```
+┌ 🔍 fast ccs2 near Bopal            ✕ ◎ ┐
+├────────────────────────────────────────┤
+│ UNDERSTOOD  [Fast 50 kW+ ✕] [CCS2 ✕] [📍 Bopal ✕] │
+│ STATIONS    ⚡ Tata Power – Riya Autolink   1/2 free │
+│ OPERATORS   🏢 Tata Power · 8 stations              │
+│ CITIES      📍 Ahmedabad · 37 stations              │
+│ PLACES      🔍 Search places for "Bopal"  Press Enter│
+└────────────────────────────────────────┘
+```
+
+| State | What shows |
+|---|---|
+| Box empty, focused | Quick chips (Near me · Fast · Open now · CCS2), **Recent** (last 5, this browser only, "Clear recent searches"), **Try** examples |
+| Typing | **Understood** chips (each ✕ removes those words), then Stations (live "free" badge), Operators, Cities, and "Search places for …". The list under the map narrows by name as you type. |
+| Typo | "Did you mean Tata Power?" at the top; picking it fixes the words and keeps the box open |
+| Nothing matches | "No stations, operators or cities match … Press Enter to look for a place." |
+| Suggestions down | "Suggestions are unavailable right now. Press Enter to search." |
+| Enter | The understood words become filter chips (saved in the address, so Back undoes them). Then: an exact station name selects its pin; an operator filters to its stations; a city or place (Nominatim, only now) moves the map. |
+| After search | Filters that came from typing (operator, "60 kW+", "Under ₹15/kWh", or plugs without their own chip) appear as removable chips in the filter row |
+| No stations | The list names the filter that hides the most ("Show without Open now · 7 stations") next to "Clear all filters" |
+
+- **Desktop:** a glass dropdown under the bar (at most 60% of the screen height, scrolls), closed by Esc or a click elsewhere.
+- **Phone:** tapping the box makes the search fill the screen (solid background, ← to close) so the keyboard and the 44 px targets fit. Picking anything returns to the map with results in the bottom sheet.
+- **Keyboard:** ↓/↑ move through suggestions, Enter picks one (or searches), Esc closes. The input is an ARIA combobox and the number of suggestions is announced.
+
 ### Station page (`/stations/:id`)
 ```
 Tata Power – Riya Autolink      ★4.7  1.2 km · 6 min

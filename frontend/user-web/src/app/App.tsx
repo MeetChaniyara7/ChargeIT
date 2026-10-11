@@ -5,7 +5,8 @@ import { ProtectedRoute } from '../features/auth/ProtectedRoute';
 import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
 import { LandingPage } from '../features/home/LandingPage';
-import { StationsPage } from '../features/stations/StationsPage';
+import { ExplorePage } from '../features/stations/ExplorePage';
+import { StationPage } from '../features/stations/StationPage';
 import { BookingsPage } from '../features/bookings/BookingsPage';
 import { ChargingPage } from '../features/charging/ChargingPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
@@ -48,8 +49,9 @@ export const App: React.FC = () => {
                 </ProtectedRoute>
               }
             >
-              <Route path="/explore" element={<StationsPage />} />
-              <Route path="/bookings" element={<BookingsPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/stations/:stationId" element={<StationPage />} />
+              <Route path="/bookings"element={<BookingsPage />} />
               <Route path="/charging" element={<ChargingPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/vehicles" element={<VehiclesPage />} />
