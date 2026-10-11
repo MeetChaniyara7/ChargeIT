@@ -34,9 +34,13 @@ The agreed look, feel and screen flow for every ChargeSpot screen. The prompts t
 | `primary-strong` | `#16A34A` | primary hover/pressed |
 | `info` | `#38BDF8` | your location, links, info |
 | `warning` | `#F59E0B` | few left, hold timer, end-of-slot warning |
-| `danger` | `#F43F5E` | busy, errors, cancel |
+| `danger` | `#F43F5E` | busy, errors, cancel (text on page/cards, map pins) |
+| `danger-strong` | `#E11D48` | red **backgrounds**, i.e. the danger button (white on `#F43F5E` is only 3.7:1) |
+| `danger-soft` | `#FB7185` | red **text on a tinted red background** (badges, error alerts; plain `danger` is only 4.1:1 there) |
+| `field-border` | `#55688F` | outlines of inputs and chips (WCAG needs 3:1 for UI boundaries; `border` is only a soft divider) |
+| `on-primary` | `#052E16` | text on green buttons (white on `#22C55E` is only 2.2:1) |
 
-All colours are CSS variables (Tailwind v4 `@theme`), so a light theme can be added later without touching components.
+All colours are CSS variables (Tailwind v4 `@theme`), so a light theme can be added later without touching components. The tokens live in `frontend/shared/src/styles/tokens.css` and every text/background pair was checked against WCAG AA (4.5:1 text, 3:1 borders).
 
 ### Type, shape, motion
 - **Font:** Plus Jakarta Sans (Google Fonts). **Tabular (fixed-width) numbers** for prices, kWh, times and OTP digits.
@@ -62,7 +66,7 @@ Public                          Signed in: bottom tabs on phone, top bar on desk
                                             /profile/vehicles
                                 (admins)    /admin/...            see section 6
 ```
-`/dashboard` (old) redirects to `/explore`. Signed-in users visiting `/` go to `/explore`.
+`/dashboard` (old) redirects to `/explore`. Signed-in users visiting `/` go to `/explore`. After signing in, users return to the page they were heading to (e.g. `/explore?q=bopal` from the landing search). `/dev/ui` (development builds only) is the component style guide.
 
 ---
 

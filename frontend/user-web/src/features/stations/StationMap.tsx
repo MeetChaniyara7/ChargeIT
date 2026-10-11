@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { formatINR } from '@chargespot/shared';
+import { CONNECTOR_LABELS, formatINR } from '@chargespot/shared';
+import type { ConnectorType } from '@chargespot/shared';
+import { availabilityFor, buttonClasses } from '../../components/ui';
+import type { Availability } from '../../components/ui';
 import type { StationData } from './StationCard';
 
 const escapeHtml = (value: string): string =>
@@ -20,6 +23,63 @@ interface StationMapProps {
   onReserveClick: (stationId: string) => void;
 }
 
+// Pin colour by availability: the same meaning as the status badges everywhere else.
+const PIN_COLOR: Record<Availability, string> = {
+  free: 'bg-primary',
+  few: 'bg-warning',
+  busy: 'bg-danger',
+  offline: 'bg-muted',
+};
+
+const AVAILABILITY_TEXT: Record<Availability, string> = {
+  free: 'text-primary',
+  few: 'text-warning',
+  busy: 'text-danger',
+  offline: 'text-muted',
+};
+
+const BOLT = '<path d="M13.2 2 5 13.5h5.3L9.4 22 19 9.8h-5.6z"/>';
+
+/** A teardrop pin with a bolt, coloured by availability and larger when selected. */
+const pinHtml = (availability: Availability, selected: boolean): string => {
+  const size = selected ? 'size-10 ring-4 ring-info/40' : 'size-8';
+  return `
+    <div class="${PIN_COLOR[availability]} ${size} flex rotate-[-45deg] items-center justify-center rounded-[50%_50%_50%_0] border-2 border-white shadow-e2">
+      <svg viewBox="0 0 24 24" class="size-4 rotate-45 fill-on-primary" aria-hidden="true">${BOLT}</svg>
+    </div>`;
+};
+
+const userMarkerHtml = `
+  <div class="relative size-6">
+    <span class="absolute inset-0 animate-ping rounded-full bg-info/40"></span>
+    <span class="absolute left-1 top-1 size-4 rounded-full border-[3px] border-white bg-info"></span>
+  </div>`;
+
+const popupHtml = (st: StationData): string => {
+  const free = st.available_chargers ?? 0;
+  const total = st.total_chargers ?? 0;
+  const availability = availabilityFor(free, total);
+  const connectors = st.connector_types?.length
+    ? st.connector_types.map((t) => escapeHtml(CONNECTOR_LABELS[t as ConnectorType] ?? t)).join(', ')
+    : 'Unknown';
+  const price = st.price_per_kwh !== undefined ? `${formatINR(st.price_per_kwh)}/kWh` : '—';
+
+  return `
+    <div class="w-56 p-3">
+      <h4 class="pr-4 text-sm font-bold text-fg">${escapeHtml(st.name)}</h4>
+      <p class="mt-1 text-xs text-muted">${escapeHtml(st.address || 'Address unknown')}</p>
+      <div class="mt-3 flex items-center justify-between text-sm">
+        <span class="font-bold ${AVAILABILITY_TEXT[availability]}">${total > 0 ? `${free}/${total} free` : 'No chargers'}</span>
+        <span class="num font-bold text-fg">${price}</span>
+      </div>
+      <p class="mt-2 text-xs text-muted">Plugs: ${connectors}</p>
+      ${st.has_estimated_data ? '<p class="mt-2"><span class="rounded-full border border-dotted border-muted px-2 py-0.5 text-xs text-muted">Approximate</span></p>' : ''}
+      <button type="button" data-reserve="${escapeHtml(st.station_id)}" class="${buttonClasses({ size: 'md', fullWidth: true })} mt-3">
+        Reserve slot
+      </button>
+    </div>`;
+};
+
 export const StationMap: React.FC<StationMapProps> = ({
   stations,
   userLocation,
@@ -31,6 +91,12 @@ export const StationMap: React.FC<StationMapProps> = ({
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
   const userMarkerRef = useRef<L.Marker | null>(null);
+
+  // Map events always call the latest handlers without rebuilding the map.
+  const handlers = useRef({ onSelectStation, onReserveClick });
+  useEffect(() => {
+    handlers.current = { onSelectStation, onReserveClick };
+  });
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -55,7 +121,6 @@ export const StationMap: React.FC<StationMapProps> = ({
         maxZoom: 19,
       }).addTo(map);
 
-      // Add custom zoom control in top-right
       L.control.zoom({ position: 'topright' }).addTo(map);
 
       mapRef.current = map;
@@ -64,98 +129,46 @@ export const StationMap: React.FC<StationMapProps> = ({
 
     const map = mapRef.current;
 
-    // Clear existing station markers
+    // Clear existing markers
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
-
     userMarkerRef.current?.remove();
     userMarkerRef.current = null;
 
-    // 1. Add User Location Marker (Pulse Ring)
+    // Your location
     if (userLocation) {
       const userIcon = L.divIcon({
-        className: 'custom-user-marker',
-        html: `
-          <div style="position: relative; width: 24px; height: 24px;">
-            <div style="position: absolute; width: 24px; height: 24px; border-radius: 50%; background: rgba(6, 182, 212, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border-radius: 50%; background: #06b6d4; border: 3px solid #ffffff; box-shadow: 0 0 10px #06b6d4;"></div>
-          </div>
-        `,
+        className: 'station-pin',
+        html: userMarkerHtml,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       });
-
-      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, title: 'Your location' })
         .addTo(map)
-        .bindTooltip('Your Current Location', { permanent: false, direction: 'top' });
+        .bindTooltip('Your location', { permanent: false, direction: 'top' });
     }
 
-    // 2. Add Station Markers
+    // Stations
     stations.forEach((st) => {
       const isSelected = st.station_id === selectedStationId;
-      const available = st.available_chargers ?? 0;
-      const isAvailable = available > 0;
-      const pinColor = isSelected ? '#10b981' : isAvailable ? '#06b6d4' : '#ef4444';
+      const availability = availabilityFor(st.available_chargers ?? 0, st.total_chargers ?? 0);
+      const px = isSelected ? 40 : 32;
 
       const stationIcon = L.divIcon({
-        className: `custom-station-pin-${st.station_id}`,
-        html: `
-          <div style="
-            background: ${pinColor};
-            width: ${isSelected ? '36px' : '30px'};
-            height: ${isSelected ? '36px' : '30px'};
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid #ffffff;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: all 0.2s ease;
-          ">
-            <div style="transform: rotate(45deg); color: #090d16; font-weight: bold; font-size: 11px;">⚡</div>
-          </div>
-        `,
-        iconSize: [isSelected ? 36 : 30, isSelected ? 36 : 30],
-        iconAnchor: [isSelected ? 18 : 15, isSelected ? 36 : 30],
+        className: 'station-pin',
+        html: pinHtml(availability, isSelected),
+        iconSize: [px, px],
+        iconAnchor: [px / 2, px],
+        popupAnchor: [0, -px],
       });
 
-      const marker = L.marker([st.latitude, st.longitude], { icon: stationIcon }).addTo(map);
+      const marker = L.marker([st.latitude, st.longitude], { icon: stationIcon, title: st.name }).addTo(map);
+      marker.bindPopup(popupHtml(st), { closeButton: true, minWidth: 224 });
 
-      // Popup Content
-      const connectorTypes = st.connector_types?.length
-        ? st.connector_types.map(escapeHtml).join(', ')
-        : 'Not specified';
-      const price = st.price_per_kwh !== undefined
-        ? `${formatINR(st.price_per_kwh)}/kWh`
-        : 'Price unavailable';
-      const popupHtml = `
-        <div style="padding: 4px; width: 200px;">
-          <h4 style="margin: 0; font-size: 13px; font-weight: bold; color: #ffffff;">${escapeHtml(st.name)}</h4>
-          <p style="margin: 4px 0; font-size: 11px; color: #94a3b8;">${escapeHtml(st.address || 'Metro Station')}</p>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0; font-size: 11px;">
-            <span style="color: #10b981; font-weight: 600;">${st.available_chargers ?? 0}/${st.total_chargers ?? 0} Available</span>
-            <span style="color: #ffffff; font-weight: bold;">${price}</span>
-          </div>
-          <p style="margin: 4px 0; font-size: 11px; color: #cbd5e1;">Connectors: ${connectorTypes}</p>
-          <p style="margin: 4px 0 8px; font-size: 11px; color: #cbd5e1;">Status: ${escapeHtml(st.charger_status_summary || 'No chargers')}</p>
-          <button id="pop-nav-${st.station_id}" style="width: 100%; padding: 6px; background: #10b981; color: #ffffff; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 4px;">
-            Reserve Slot
-          </button>
-        </div>
-      `;
-
-      marker.bindPopup(popupHtml);
-
-      marker.on('click', () => {
-        onSelectStation(st.station_id);
-      });
-
+      marker.on('click', () => handlers.current.onSelectStation(st.station_id));
       marker.on('popupopen', () => {
-        const btn = document.getElementById(`pop-nav-${st.station_id}`);
-        if (btn) {
-          btn.onclick = () => onReserveClick(st.station_id);
-        }
+        const button = marker.getPopup()?.getElement()?.querySelector<HTMLButtonElement>('[data-reserve]');
+        if (button) button.onclick = () => handlers.current.onReserveClick(st.station_id);
       });
 
       markersRef.current[st.station_id] = marker;
@@ -171,9 +184,7 @@ export const StationMap: React.FC<StationMapProps> = ({
     } else if (userLocation) {
       map.setView([userLocation.lat, userLocation.lng], 12, { animate: false });
     } else if (stations.length > 0) {
-      const bounds = L.latLngBounds(
-        stations.map((station): [number, number] => [station.latitude, station.longitude])
-      );
+      const bounds = L.latLngBounds(stations.map((station): [number, number] => [station.latitude, station.longitude]));
       map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false });
     }
 
@@ -181,11 +192,11 @@ export const StationMap: React.FC<StationMapProps> = ({
   }, [stations, userLocation, selectedStationId]);
 
   return (
-    <div className="w-full h-full min-h-[400px] lg:min-h-[600px] rounded-2xl overflow-hidden glass-card relative border border-slate-800">
-      <div ref={mapContainerRef} className="w-full h-full min-h-[400px] lg:min-h-[600px]" />
+    <div className="relative h-full min-h-[400px] w-full overflow-hidden rounded-card border border-border bg-surface lg:min-h-[600px]">
+      <div ref={mapContainerRef} className="h-full min-h-[400px] w-full lg:min-h-[600px]" />
       {stations.length === 0 && (
-        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-slate-950/70 px-6 text-center pointer-events-none">
-          <p className="text-sm font-semibold text-slate-300">No charging stations found</p>
+        <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-bg/70 px-6 text-center">
+          <p className="text-sm font-bold text-muted">No charging stations to show</p>
         </div>
       )}
     </div>

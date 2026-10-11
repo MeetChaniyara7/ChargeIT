@@ -1,0 +1,91 @@
+/* ChargeSpot design tokens: "Midnight Charge" (see docs/ui-flow.md section 1).
+ *
+ * Shared by the driver web app and the station kiosk. Every colour, radius, shadow and
+ * font in the UI comes from here, so a theme change (e.g. a light mode later) is a change
+ * to this one file. Tailwind v4 turns the @theme values below into utility classes:
+ *   bg-bg bg-surface bg-raised  border-border  text-fg text-muted  bg-primary text-danger ...
+ *   rounded-control rounded-card rounded-sheet   shadow-e1 shadow-e2 shadow-e3
+ * Spacing uses Tailwind's default 4 px scale (p-1 = 4 px, p-2 = 8 px, ...).
+ *
+ * Colour rules: green = available and main actions, amber = few left / warnings / timers,
+ * rose = busy / errors / destructive, sky = information and "you are here".
+ */
+
+@theme {
+  /* Surfaces: page < card < raised (hover, inputs, popovers) */
+  --color-bg: #0b1120;
+  --color-surface: #111a2e;
+  --color-raised: #18233b;
+
+  /* Lines. `border` is a soft divider; `field-border` is stronger because input
+     outlines need 3:1 contrast against their background (WCAG 1.4.11). */
+  --color-border: #24314d;
+  --color-field-border: #55688f;
+
+  /* Text */
+  --color-fg: #e6edf7;
+  --color-muted: #94a3b8;
+
+  /* Brand and meaning */
+  --color-primary: #22c55e;
+  --color-primary-strong: #16a34a;
+  --color-on-primary: #052e16; /* dark text on green: white on #22c55e is only 2.2:1 */
+  --color-info: #38bdf8;
+  --color-warning: #f59e0b;
+  --color-danger: #f43f5e;
+  --color-danger-strong: #e11d48; /* red BACKGROUNDS (white text on #f43f5e is only 3.7:1) */
+  --color-danger-soft: #fb7185; /* red TEXT on a tinted red background (4.1:1 with plain danger) */
+
+  /* Type: Plus Jakarta Sans (loaded in index.html). Sizes: 12 / 14 / 16 / 20 / 28 / 36 px. */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-xl: 1.25rem;
+  --text-display: 1.75rem;
+  --text-hero: 2.25rem;
+
+  /* Shape: 8 px controls, 12 px cards, 16 px sheets */
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-sheet: 1rem;
+
+  /* Elevation: three levels (page 0 -> card 1 -> popover/sheet 2 -> modal 3) */
+  --shadow-e1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-e2: 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-e3: 0 12px 32px rgb(0 0 0 / 0.55);
+
+  /* The ONE glow in the app: the live charging ring (Phase 5) */
+  --shadow-glow: 0 0 24px rgb(34 197 94 / 0.45);
+}
+
+:root {
+  /* Motion: 150-250 ms ease-out */
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: dark;
+}
+
+/* Fixed-width digits so prices, kWh, times and OTP codes don't jiggle as they change. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus is always visible. Sky blue shows up on dark surfaces and on green buttons. */
+:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+
+/* Respect "reduce motion" everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

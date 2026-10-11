@@ -1,27 +1,24 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Loader2 } from 'lucide-react';
+import { SkeletonBlock, SkeletonLine } from '../../components/ui';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+/** Only lets signed-in users through; everyone else goes to Sign in and comes back afterwards. */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
-        <div className="relative">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center animate-pulse">
-            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-          </div>
-        </div>
-        <p className="text-sm font-medium text-slate-400 animate-pulse">
-          Restoring authentication session...
-        </p>
+      <div role="status" className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 p-6">
+        <span className="sr-only">Restoring your session…</span>
+        <SkeletonLine className="h-8 w-48" />
+        <SkeletonBlock className="h-40" />
+        <SkeletonBlock className="h-24" />
       </div>
     );
   }

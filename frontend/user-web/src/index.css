@@ -1,133 +1,86 @@
 @import "tailwindcss";
+@import "../../shared/src/styles/tokens.css";
 @import "leaflet/dist/leaflet.css";
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-emerald-500 selection:text-white;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    @apply bg-bg font-sans text-fg antialiased;
+    min-height: 100dvh;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
   }
 }
 
-/* Glassmorphism Design System */
-.glass-card {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-}
-
-.glass-nav {
-  background: rgba(11, 17, 30, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.gradient-text {
-  background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #3b82f6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.gradient-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  transition: all 0.2s ease-in-out;
-}
-
-.gradient-btn:hover {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-}
-
-/* Signature Electric Current Border Animation for Search Bar */
-@keyframes electric-rotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.electric-current-container {
-  position: relative;
-  border-radius: 9999px;
-  padding: 2px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.3s ease, transform 0.2s ease;
-}
-
-.electric-current-container::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    transparent 0deg,
-    transparent 270deg,
-    #06b6d4 305deg,
-    #f59e0b 335deg,
-    #10b981 350deg,
-    transparent 360deg
-  );
-  animation: electric-rotate 9s linear infinite;
-  opacity: 0.8;
-  transition: opacity 0.3s ease, animation-duration 0.3s ease;
-}
-
-.electric-current-container:focus-within::before {
-  animation-duration: 3s;
-  opacity: 1;
-  filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.9));
-}
-
-.electric-current-container:hover::before {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .electric-current-container::before {
-    animation: none;
-    background: linear-gradient(90deg, #06b6d4, #f59e0b, #10b981);
-  }
-}
-
-.electric-inner-pill {
-  position: relative;
-  z-index: 10;
-  border-radius: 9999px;
-  background: rgba(9, 14, 26, 0.95);
-  backdrop-filter: blur(12px);
-  width: 100%;
-  display: flex;
-  align-items: center;
-}
-
-/* Custom Leaflet Dark Map Overrides */
+/* ---------------------------------------------------------------------------------
+   Map (Leaflet). The map tiles are OpenStreetMap's light tiles, darkened with a filter
+   that only touches the tile images, so pins and popups keep their real colours.
+   --------------------------------------------------------------------------------- */
 .leaflet-container {
-  background: #090d16 !important;
+  background: var(--color-bg);
   font-family: inherit;
 }
 
-/* OpenStreetMap tiles are light; this filter turns them dark to match the UI.
-   Only the tile images are filtered, so markers and popups keep their real colours. */
 .map-tiles-dark {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%) saturate(80%);
 }
 
 .leaflet-popup-content-wrapper {
-  background: rgba(15, 23, 42, 0.95) !important;
-  color: #f8fafc !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 1rem !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-e2);
+}
+
+.leaflet-popup-content {
+  margin: 0;
 }
 
 .leaflet-popup-tip {
-  background: rgba(15, 23, 42, 0.95) !important;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+.leaflet-popup-close-button {
+  color: var(--color-muted) !important;
+}
+
+.leaflet-bar {
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--shadow-e1) !important;
+  border-radius: var(--radius-control) !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.leaflet-bar a:hover {
+  background-color: var(--color-raised);
+  color: var(--color-fg);
+}
+
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent) !important;
+  color: var(--color-muted) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-info) !important;
+}
+
+/* Station pins are plain divs; Leaflet needs the wrapper to have no default styling. */
+.station-pin {
+  background: none;
+  border: none;
 }

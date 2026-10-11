@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { CONNECTOR_LABELS, type ConnectorType, type components } from '@chargespot/shared';
+import { useSearchParams } from 'react-router-dom';
+import { AlertCircle, List, Map, MapPin, RefreshCw } from 'lucide-react';
+import type { components } from '@chargespot/shared';
 import { apiFetch } from '../../lib/api';
+import { Button, Card, Chip, EmptyState, SkeletonBlock, useToast } from '../../components/ui';
 import { SearchBar } from './SearchBar';
 import { StationCard } from './StationCard';
 import type { StationData } from './StationCard';
 import { StationMap } from './StationMap';
-import { MapPin, Map, List, AlertCircle, RefreshCw, CheckCircle2, Zap } from 'lucide-react';
 
 // Haversine formula to compute distance in km between two GPS coordinates
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -21,9 +23,6 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 // Shapes generated from the API (frontend/shared/src/api-types.ts). Each charger is one plug.
 type ApiStation = components['schemas']['StationResponse'];
-
-const connectorLabel = (type: string): string =>
-  CONNECTOR_LABELS[type as ConnectorType] ?? type;
 
 const isValidCoordinate = (latitude: number, longitude: number): boolean =>
   Number.isFinite(latitude) && Number.isFinite(longitude) &&
@@ -63,14 +62,17 @@ const mapApiStation = (item: ApiStation): StationData | null => {
     total_chargers: chargers.length,
     available_chargers: chargers.filter((charger) => charger.status === 'AVAILABLE').length,
     price_per_kwh: prices.length > 0 ? Math.min(...prices) : undefined,
-    connector_types: [...new Set(chargers.map((charger) => connectorLabel(charger.connector_type)))],
+    connector_types: [...new Set(chargers.map((charger) => charger.connector_type))],
     charger_status_summary: Object.entries(statusCounts)
       .map(([status, count]) => `${count} ${status.toLowerCase()}`)
       .join(', '),
+    has_estimated_data: item.has_estimated_data,
   };
 };
 
 export const StationsPage: React.FC = () => {
+  const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [stations, setStations] = useState<StationData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -78,9 +80,9 @@ export const StationsPage: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // The landing page search sends people here with ?q=<text>.
+  const [searchQuery, setSearchQuery] = useState<string>(searchParams.get('q') ?? '');
   const [viewMode, setViewMode] = useState<'both' | 'list' | 'map'>('both');
-  const [reservationNotice, setReservationNotice] = useState<string | null>(null);
 
   // 1. Request Geolocation on Load
   const requestLocation = () => {
@@ -164,171 +166,111 @@ export const StationsPage: React.FC = () => {
     })
     .sort((a, b) => (a.distance_km ?? 0) - (b.distance_km ?? 0));
 
-  // Handler for Reserve Slot action stub
+  // Booking arrives in a later update; say so honestly instead of pretending.
   const handleReserveSlot = (stationId: string) => {
     const st = stations.find((s) => s.station_id === stationId);
-    setReservationNotice(`Reservation flow stubbed for ${st?.name || 'Station'}. Route: /reserve/${stationId}`);
-    setTimeout(() => {
-      setReservationNotice(null);
-    }, 4000);
+    toast.info(`Booking opens in an upcoming update. ${st?.name ?? 'This station'} is on your list.`);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
-        {/* 2. Hero Search Bar Component */}
-        <SearchBar
-          onSearchSubmit={(q) => setSearchQuery(q)}
-          onRequestLocation={requestLocation}
-          currentCityQuery={searchQuery}
-        />
+    <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 lg:px-8">
+      <SearchBar
+        onSearchSubmit={(q) => setSearchQuery(q)}
+        onRequestLocation={requestLocation}
+        currentCityQuery={searchQuery}
+      />
 
-        {/* Reservation Toast Notification Stub */}
-        {reservationNotice && (
-          <div className="p-4 rounded-xl glass-card bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-fade-in">
-            <div className="flex items-center space-x-2.5">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>{reservationNotice}</span>
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-200 uppercase font-mono">
-              Future Build Stub
-            </span>
-          </div>
-        )}
-
-        {/* Geolocation Fallback Prompt Banner if Denied */}
-        {locationStatus === 'denied' && (
-          <div className="p-4 rounded-2xl glass-card bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center space-x-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-              <div>
-                <span className="font-bold text-amber-200 block">Location Access Disabled</span>
-                Showing stations near default location. Type a city above or enable location for exact distances.
-              </div>
-            </div>
-            <button
-              onClick={requestLocation}
-              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 font-semibold transition-colors cursor-pointer shrink-0"
-            >
-              Try Location Again
-            </button>
-          </div>
-        )}
-
-        {/* Section Title & Mobile Toggle Controls */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              <Zap className="w-5 h-5 text-emerald-400 stroke-[2.5]" />
-              <span>Nearby Charging Stations</span>
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {filteredStations.length} stations found sorted by proximity
+      {/* Shown when location access was refused */}
+      {locationStatus === 'denied' && (
+        <div role="status" className="flex flex-col items-start justify-between gap-3 rounded-card border border-warning/30 bg-warning/10 p-4 text-sm sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
+            <p>
+              <span className="block font-bold text-warning">Location is off</span>
+              Showing stations near a default location. Search for a place above, or turn on location for exact distances.
             </p>
           </div>
+          <Button variant="secondary" onClick={requestLocation} className="shrink-0">
+            Try again
+          </Button>
+        </div>
+      )}
 
-          {/* Mobile View Toggle Buttons (List View / Map View) */}
-          <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 lg:hidden">
-            <button
-              onClick={() => setViewMode(viewMode === 'list' ? 'both' : 'list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
-                viewMode === 'list'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>List</span>
-            </button>
-            <button
-              onClick={() => setViewMode(viewMode === 'map' ? 'both' : 'map')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${
-                viewMode === 'map'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Map className="w-3.5 h-3.5" />
-              <span>Map</span>
-            </button>
-          </div>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold">Nearby charging stations</h1>
+          <p className="num mt-0.5 text-sm text-muted" aria-live="polite">
+            {loading ? 'Loading…' : `${filteredStations.length} found, nearest first`}
+          </p>
         </div>
 
-        {/* 3. Hybrid Map + List Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Station List Sidebar (7 Cols on Desktop) */}
-          <div
-            className={`space-y-4 lg:col-span-7 transition-all ${
-              viewMode === 'map' ? 'hidden lg:block' : 'block'
-            }`}
-          >
-            {loading ? (
-              <div className="min-h-[350px] glass-card rounded-2xl flex flex-col items-center justify-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
-                <p className="text-xs font-medium text-slate-400">Loading EV charging station network...</p>
-              </div>
-            ) : fetchError ? (
-              <div className="min-h-[350px] glass-card rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-3">
-                <AlertCircle className="w-10 h-10 text-rose-400" />
-                <h3 className="text-base font-bold text-white">Unable to Load Charging Stations</h3>
-                <p className="text-xs text-slate-400 max-w-sm">{fetchError}</p>
-                <button
-                  onClick={() => setRetryToken((token) => token + 1)}
-                  className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-semibold shadow-md cursor-pointer"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : filteredStations.length === 0 ? (
-              /* Empty State */
-              <div className="min-h-[350px] glass-card rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-3">
-                <MapPin className="w-10 h-10 text-slate-600" />
-                <h3 className="text-base font-bold text-white">No charging stations found</h3>
-                <p className="text-xs text-slate-400 max-w-sm">
-                  We couldn't find any EV stations matching "{searchQuery}". Try clearing your search or typing a different city.
-                </p>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-semibold shadow-md cursor-pointer"
-                >
-                  Clear Search Filter
-                </button>
-              </div>
-            ) : (
-              /* Render Scrollable Station Cards List */
-              <div className="space-y-4 max-h-[650px] overflow-y-auto pr-1 custom-scrollbar">
-                {filteredStations.map((station) => (
-                  <div
-                    key={station.station_id}
-                    onClick={() => setSelectedStationId(station.station_id)}
-                  >
-                    <StationCard
-                      station={station}
-                      onReserveClick={handleReserveSlot}
-                      isSelected={selectedStationId === station.station_id}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Interactive Station Map (5 Cols on Desktop) */}
-          <div
-            className={`h-[450px] lg:h-[650px] lg:col-span-5 sticky top-20 transition-all ${
-              viewMode === 'list' ? 'hidden lg:block' : 'block'
-            }`}
-          >
-            <StationMap
-              stations={filteredStations}
-              userLocation={userLocation}
-              selectedStationId={selectedStationId}
-              onSelectStation={(id) => setSelectedStationId(id)}
-              onReserveClick={handleReserveSlot}
-            />
-          </div>
+        {/* On phones, switch between the list and the map */}
+        <div className="flex gap-2 lg:hidden" role="group" aria-label="Show">
+          <Chip selected={viewMode === 'list'} onSelectedChange={(on) => setViewMode(on ? 'list' : 'both')}>
+            <List className="size-4" aria-hidden="true" />
+            List
+          </Chip>
+          <Chip selected={viewMode === 'map'} onSelectedChange={(on) => setViewMode(on ? 'map' : 'both')}>
+            <Map className="size-4" aria-hidden="true" />
+            Map
+          </Chip>
         </div>
-      </main>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        {/* Station list */}
+        <div className={`space-y-4 lg:col-span-7 ${viewMode === 'map' ? 'hidden lg:block' : 'block'}`}>
+          {loading ? (
+            <div role="status" className="space-y-4">
+              <span className="sr-only">Loading charging stations…</span>
+              <SkeletonBlock className="h-44" />
+              <SkeletonBlock className="h-44" />
+              <SkeletonBlock className="h-44" />
+            </div>
+          ) : fetchError ? (
+            <Card className="flex flex-col items-center gap-3 p-8 text-center">
+              <AlertCircle className="size-10 text-danger" aria-hidden="true" />
+              <h2 className="text-xl font-bold">Couldn't load charging stations</h2>
+              <p className="max-w-sm text-sm text-muted">{fetchError}</p>
+              <Button icon={<RefreshCw className="size-4" aria-hidden="true" />} onClick={() => setRetryToken((token) => token + 1)}>
+                Try again
+              </Button>
+            </Card>
+          ) : filteredStations.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<MapPin className="size-7" />}
+                title="No charging stations found"
+                text={searchQuery.trim() ? `Nothing matches "${searchQuery.trim()}". Try a different search.` : 'There are no stations to show yet.'}
+                action={searchQuery.trim() ? <Button onClick={() => setSearchQuery('')}>Clear search</Button> : undefined}
+              />
+            </Card>
+          ) : (
+            <div className="max-h-[650px] space-y-4 overflow-y-auto pr-1">
+              {filteredStations.map((station) => (
+                <StationCard
+                  key={station.station_id}
+                  station={station}
+                  onSelect={setSelectedStationId}
+                  onReserveClick={handleReserveSlot}
+                  isSelected={selectedStationId === station.station_id}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Map */}
+        <div className={`h-[450px] lg:sticky lg:top-20 lg:col-span-5 lg:h-[650px] ${viewMode === 'list' ? 'hidden lg:block' : 'block'}`}>
+          <StationMap
+            stations={filteredStations}
+            userLocation={userLocation}
+            selectedStationId={selectedStationId}
+            onSelectStation={(id) => setSelectedStationId(id)}
+            onReserveClick={handleReserveSlot}
+          />
+        </div>
+      </div>
     </div>
   );
 };

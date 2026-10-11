@@ -1,6 +1,16 @@
 import React from 'react';
-import { Navigation, Zap, MapPin } from 'lucide-react';
-import { formatINR } from '@chargespot/shared';
+import { MapPin, Navigation, Zap } from 'lucide-react';
+import {
+  ApproximateTag,
+  availabilityFor,
+  Button,
+  Card,
+  ConnectorIcon,
+  cx,
+  Money,
+  StatusBadge,
+} from '../../components/ui';
+import { directionsUrl } from './directions';
 
 export interface StationData {
   station_id: string;
@@ -12,139 +22,109 @@ export interface StationData {
   total_chargers?: number;
   available_chargers?: number;
   price_per_kwh?: number;
+  /** Connector type codes, e.g. "CCS2" (ConnectorIcon turns them into labels). */
   connector_types?: string[];
   charger_status_summary?: string;
   distance_km?: number;
+  /** True when some shown values were estimated rather than imported. */
+  has_estimated_data?: boolean;
 }
 
 interface StationCardProps {
   station: StationData;
+  onSelect?: (stationId: string) => void;
   onReserveClick?: (stationId: string) => void;
   isSelected?: boolean;
 }
 
-export const StationCard: React.FC<StationCardProps> = ({
-  station,
-  onReserveClick,
-  isSelected = false,
-}) => {
-  const total = station.total_chargers ?? 4;
-  const available = station.available_chargers ?? 3;
-  const isAvailable = available > 0;
-  const priceDisplay = station.price_per_kwh ? formatINR(station.price_per_kwh) : '—';
-  const connectors = station.connector_types && station.connector_types.length > 0
-    ? station.connector_types
-    : ['CCS2', 'Type 2'];
-
-  const handleNavigate = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const query = encodeURIComponent(`${station.name}, ${station.address}`);
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}&query_place_id=${query}`;
-    window.open(googleMapsUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleReserve = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onReserveClick) {
-      onReserveClick(station.station_id);
-    }
-  };
+export const StationCard: React.FC<StationCardProps> = ({ station, onSelect, onReserveClick, isSelected = false }) => {
+  const total = station.total_chargers ?? 0;
+  const available = station.available_chargers ?? 0;
+  const connectors = station.connector_types ?? [];
 
   return (
-    <div
-      className={`p-5 rounded-2xl glass-card transition-all duration-300 relative overflow-hidden group cursor-pointer ${
-        isSelected
-          ? 'border-emerald-500/60 ring-2 ring-emerald-500/20 shadow-xl shadow-emerald-950/20'
-          : 'hover:border-slate-700/80 hover:shadow-2xl'
-      }`}
+    <Card
+      elevation={isSelected ? 2 : 1}
+      className={cx('cursor-pointer p-4 transition-colors duration-150', isSelected ? 'border-primary' : 'hover:border-field-border')}
+      onClick={() => onSelect?.(station.station_id)}
     >
-      {/* Top Header: Name, Distance & Area */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <h3 className="text-base font-bold text-white tracking-tight group-hover:text-emerald-300 transition-colors line-clamp-1">
-            {station.name}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-bold">
+            {/* A real button, so keyboard and screen-reader users can select a station too. */}
+            <button
+              type="button"
+              aria-pressed={isSelected}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect?.(station.station_id);
+              }}
+              className="rounded text-left hover:text-primary"
+            >
+              {station.name}
+            </button>
           </h3>
-          <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <span className="truncate max-w-[200px]">{station.address || station.city || 'Metro Area'}</span>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
+            <MapPin className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{station.address || station.city || 'Address unknown'}</span>
             {station.distance_km !== undefined && (
               <>
-                <span className="text-slate-600">•</span>
-                <span className="font-semibold text-cyan-400">{station.distance_km.toFixed(1)} km away</span>
+                <span aria-hidden="true">·</span>
+                <span className="num shrink-0 font-bold text-info">{station.distance_km.toFixed(1)} km</span>
               </>
             )}
           </p>
         </div>
-
-        {/* Live Availability Badge */}
-        <div
-          className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0 border ${
-            isAvailable
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-          }`}
-        >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isAvailable ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
-            }`}
-          />
-          <span>
-            {available}/{total} Available
-          </span>
-        </div>
+        <StatusBadge
+          className="shrink-0"
+          status={availabilityFor(available, total)}
+          label={total > 0 ? `${available}/${total} free` : 'No chargers'}
+        />
       </div>
 
-      {/* Decision-Relevant Info: Starting Price & Connectors Badges */}
-      <div className="flex items-center justify-between py-3 border-y border-slate-800/80 my-3">
-        {/* Starting Price */}
+      <div className="my-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-y border-border py-3">
         <div>
-          <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block">
-            Starting Price
-          </span>
-          <span className="text-sm font-bold text-white flex items-baseline gap-0.5">
-            {priceDisplay}
-            <span className="text-xs font-normal text-slate-400">/kWh</span>
-          </span>
+          <p className="text-xs text-muted">From</p>
+          <p className="text-base font-bold">
+            <Money value={station.price_per_kwh} perKwh />
+          </p>
         </div>
-
-        {/* Connector Badges Row */}
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          {connectors.map((conn) => (
-            <span
-              key={conn}
-              className="px-2 py-0.5 rounded-md bg-slate-900/90 text-slate-300 border border-slate-800 text-[11px] font-mono font-medium flex items-center gap-1"
-            >
-              <Zap className="w-3 h-3 text-amber-400" />
-              {conn}
-            </span>
-          ))}
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
+          {connectors.length > 0 ? (
+            connectors.map((type) => <ConnectorIcon key={type} type={type} />)
+          ) : (
+            <span className="text-muted">Plug types unknown</span>
+          )}
         </div>
       </div>
 
-      {/* Two Distinct Actions */}
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        {/* 1. Navigate — Secondary / Outline Style (Instant Google Maps link) */}
-        <button
-          type="button"
-          onClick={handleNavigate}
-          className="py-2.5 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 border border-slate-700/80 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer hover:border-slate-600"
-        >
-          <Navigation className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span>Navigate</span>
-        </button>
-
-        {/* 2. Reserve Slot — Primary Style (Triggers /reserve/:stationId stub) */}
-        <button
-          type="button"
-          onClick={handleReserve}
-          disabled={!isAvailable}
-          className="py-2.5 px-3 rounded-xl gradient-btn text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-950/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <Zap className="w-4 h-4 text-emerald-200 shrink-0 fill-emerald-200" />
-          <span>Reserve Slot</span>
-        </button>
+      <div className="flex flex-wrap items-center gap-3">
+        {station.has_estimated_data && (
+          <ApproximateTag reason="Some chargers, power or prices at this station are estimated from typical values for its operator." />
+        )}
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="secondary"
+            icon={<Navigation className="size-4" aria-hidden="true" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(directionsUrl(station), '_blank', 'noopener,noreferrer');
+            }}
+          >
+            Navigate
+          </Button>
+          <Button
+            disabled={available === 0}
+            icon={<Zap className="size-4" aria-hidden="true" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReserveClick?.(station.station_id);
+            }}
+          >
+            Reserve slot
+          </Button>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 };

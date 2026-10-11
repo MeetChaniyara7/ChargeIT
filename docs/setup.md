@@ -171,6 +171,8 @@ npm run dev:web
 
 Open http://localhost:5173. The API must be running for login and the map to work.
 
+While developing, http://localhost:5173/dev/ui shows every shared UI component in every state (it is not included in production builds).
+
 ### Build and lint
 
 ```bash
