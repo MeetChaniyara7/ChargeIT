@@ -1,6 +1,6 @@
 // One place for every call to the ChargeSpot API.
 // - Adds the login token (Authorization: Bearer ...) when the user is signed in.
-// - Turns the API's error format {"error": {"code", "message"}} into an ApiError.
+// - Turns the API's error format {"error": {"code", "message", "details"?}} into an ApiError.
 // - On 401 (token missing/expired) clears the stored token and tells the app to sign out.
 
 const configuredUrl: string | undefined = import.meta.env.VITE_API_URL;
@@ -21,12 +21,15 @@ export const tokenStorage = {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Extra facts some errors carry, e.g. the alternatives that come with SLOT_TAKEN. */
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, details?: Record<string, unknown>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -63,11 +66,12 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       tokenStorage.clear();
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     }
-    const error = (data as { error?: { code?: string; message?: string } } | null)?.error;
+    const error = (data as { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | null)?.error;
     throw new ApiError(
       response.status,
       error?.code ?? `HTTP_${response.status}`,
       error?.message ?? `Request failed (HTTP ${response.status}).`,
+      error?.details,
     );
   }
 

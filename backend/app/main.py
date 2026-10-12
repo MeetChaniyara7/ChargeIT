@@ -16,10 +16,13 @@ from app.core.logging import setup_logging
 from app.features.auth.router import api_router as auth_api_router
 from app.features.auth.router import router as auth_router
 from app.features.availability.router import router as availability_router
+from app.features.bookings.router import router as bookings_router
 from app.features.geocoding.router import router as geocoding_router
+from app.features.payments.router import router as payments_router
 from app.features.recommendations.router import router as recommendations_router
 from app.features.search.router import router as search_router
 from app.features.stations.router import router as stations_router
+from app.features.vehicles.router import router as vehicles_router
 
 
 def create_app() -> FastAPI:
@@ -48,6 +51,9 @@ def create_app() -> FastAPI:
     app.include_router(recommendations_router)
     app.include_router(geocoding_router)
     app.include_router(search_router)
+    app.include_router(vehicles_router)
+    app.include_router(bookings_router)
+    app.include_router(payments_router)
 
     @app.get("/health", tags=["Health"])
     def health():

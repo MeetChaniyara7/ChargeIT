@@ -33,25 +33,28 @@ _STATUS_CODES = {
 class AppError(Exception):
     """Raise this from services for errors with a specific, stable code."""
 
-    def __init__(self, status_code: int, code: str, message: str):
+    def __init__(self, status_code: int, code: str, message: str, details: dict | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        # Extra facts for the front end, e.g. the alternatives that come with SLOT_TAKEN.
+        self.details = details
 
 
-def error_response(status_code: int, code: str, message: str, headers: dict | None = None) -> JSONResponse:
-    return JSONResponse(
-        status_code=status_code,
-        content={"error": {"code": code, "message": message}},
-        headers=headers,
-    )
+def error_response(
+    status_code: int, code: str, message: str, headers: dict | None = None, details: dict | None = None
+) -> JSONResponse:
+    error: dict = {"code": code, "message": message}
+    if details:
+        error["details"] = details
+    return JSONResponse(status_code=status_code, content={"error": error}, headers=headers)
 
 
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
-        return error_response(exc.status_code, exc.code, exc.message)
+        return error_response(exc.status_code, exc.code, exc.message, details=exc.details)
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

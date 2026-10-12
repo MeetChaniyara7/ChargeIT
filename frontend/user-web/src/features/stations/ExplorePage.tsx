@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parseSearch, removeToken } from '@chargespot/shared';
-import type { ParsedSearch } from '@chargespot/shared';
+import type { ConnectorType, ParsedSearch } from '@chargespot/shared';
 import { SnapSheet } from '../../components/ui';
 import type { Snap } from '../../components/ui';
 import { apiFetch } from '../../lib/api';
@@ -21,12 +21,15 @@ import { useGeocode } from './useGeocode';
 import { useGeolocation } from './useGeolocation';
 import { useLoosenFilter } from './useLoosenFilter';
 import { useRecentSearches } from './useRecentSearches';
+import { useVehicles } from '../profile/useVehicles';
 import { useRecommendations } from './useRecommendations';
 import { suggestUrl, useSearchSuggest } from './useSearchSuggest';
 import { useStations } from './useStations';
 
 /** The search from the landing page is only acted on once, even if you come back to this page. */
 const HANDLED_QUERY_KEY = 'chargespot:explore-handled-query';
+/** The default vehicle's plug is put into the filter once per session; after that the driver's own choices rule. */
+const VEHICLE_PREFILL_KEY = 'chargespot:vehicle-prefill-done';
 
 const matchesText = (station: StationSummary, text: string): boolean => {
   const q = text.trim().toLowerCase();
@@ -84,6 +87,7 @@ export const ExplorePage: React.FC = () => {
   const geolocation = useGeolocation((found) => flyTo(found, { zoom: 14 }));
   const geocode = useGeocode();
   const recentSearches = useRecentSearches();
+  const { defaultVehicle, loading: vehiclesLoading } = useVehicles();
 
   // Distances are measured from the user when we know where they are, otherwise from the map centre.
   const reference = geolocation.location ?? view.center;
@@ -93,6 +97,23 @@ export const ExplorePage: React.FC = () => {
 
   const noResults = !stationQuery.loading && !stationQuery.error && stationQuery.stations.length === 0;
   const loosen = useLoosenFilter(stationQuery.settledBounds, reference, filters, noResults && hasFilters);
+
+  // The default vehicle picks the plug filter, once per session, and only if nothing is chosen yet.
+  const filtersAreEmpty = !hasFilters;
+  const updateFilters = update;
+  useEffect(() => {
+    if (vehiclesLoading) return;
+    let done = false;
+    try {
+      done = sessionStorage.getItem(VEHICLE_PREFILL_KEY) === '1';
+      sessionStorage.setItem(VEHICLE_PREFILL_KEY, '1');
+    } catch {
+      // Storage blocked: the prefill may repeat on reload, which is harmless.
+    }
+    if (!done && defaultVehicle && filtersAreEmpty) updateFilters({ connectors: [defaultVehicle.connector_type as ConnectorType] });
+    // Only once the vehicles have loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehiclesLoading]);
 
   const handleViewChange = useCallback((newBounds: MapBounds, newView: ExploreView) => {
     setBounds(newBounds);

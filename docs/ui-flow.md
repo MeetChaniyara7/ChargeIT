@@ -134,11 +134,32 @@ Chargers  [CCS2 30 kW ₹18] [CHAdeMO 25 kW ₹19.50]  (Approximate)
 ┃ CCS2-1 · 4:30–5:30 PM · Booking fee ₹199 · est. ₹486   [Hold & pay →] ┃  sticky bar
 ```
 
+### Picking a slot (station page)
+- **Tap** a start block and an end block, or **drag** with a mouse. **Keyboard:** arrow keys move between blocks, Enter or Space picks, Esc clears. 1 to 4 adjacent free blocks on one charger.
+- A block that cannot be picked says why in one line under the grid ("That block is already booked.", "A block in between isn't free...", "You can book up to 4 blocks...").
+- The **summary bar** slides up above the phone tabs: charger, "Sat 12 Oct · 4:30–5:30 PM", booking fee ₹199, "Est. charging ₹486 (estimate)" and **Hold & pay**. The estimate is power x time x 90% efficiency x price, capped by the default vehicle's battery when its plug fits; it is blank, never invented, when price or power is unknown.
+- The pick is remembered for the session, so it survives a refresh, an expired hold, and the trip to Hold & pay.
+- **Charge now** appears under the name of a charger that is free right now (today's grid): a sheet explains "no fee, up to 2 hours", then the Ticket shows the code.
+- With an unpaid bill, picking is switched off and a banner links to Bookings -> Payment due.
+- If someone else got the slot first, the sheet **"Just taken. Here are alternatives"** lists other times on the same charger, other chargers here and nearby stations; each time or charger is held in one tap.
+
 ### Hold & pay (`/book/:id`)
-Countdown ring "Slot held for you · 4:32", summary, **Pay ₹199** (Razorpay), Cancel releases the hold.
+Countdown ring (amber under 1 minute) counted from the **server's** clock, summary card, **Pay ₹199** (Razorpay Checkout in the primary colour, name and email prefilled), **Release this slot**.
+- Paid: the server verifies the signature, then the Ticket opens with the code.
+- Declined: "Payment didn't go through", the hold continues, **Try again**. Window closed: a toast says when the hold ends. Payment taken but not yet confirmed (network): "Check again".
+- Hold ran out: "Hold expired, slot released" and a button back to the station with the blocks still selected. A payment that lands after the hold ran out takes the same slot again if it is free; otherwise it is refunded in full and the page says so.
 
 ### Ticket (`/tickets/:id`)
-Movie-ticket card: station, date and time, charger, tear line, **OTP in six digit tiles**, "Valid from 4:15 PM", Navigate, Add to calendar. Shown once; "Show new code" in Bookings.
+Movie-ticket card: check mark, station, date and time, charger, dashed tear line with notches, **OTP in six digit tiles**, "Valid from 4:15 PM", Navigate, **Add to calendar** (an .ics file made in the browser). The code is shown **once**: it travels in the page's navigation state, is copied into memory and removed from the browser history at once, so a refresh shows "Your code was shown once". "Show new code" lives in Bookings.
+
+### Bookings (`/bookings`)
+Tabs **Upcoming · Past · Payment due** (count badge, `?tab=due`). Each booking is a small ticket with a timeline (Held -> Confirmed -> Charging -> Done, or Cancelled / Expired / "No-show · fee kept").
+- Upcoming: View ticket, Show new code (a sheet warns that the old code stops working), Navigate, Cancel.
+- **Cancel** opens a sheet that asks the API for the refund first ("You will get ₹149.25 back" and which tier applies and why); Confirm cancels and a toast says what was recorded.
+- Past: a Receipt link when the fee was paid (`/receipts/:id`: paid, refunded, net).
+
+### Vehicles (`/profile/vehicles`)
+List with the default marked; add and edit in a sheet (name, plug picked with its icon, battery kWh), remove with a confirm, make default. The default vehicle sets the Explore plug filter once per session (only when no filter is chosen) and the battery limit on cost estimates.
 
 ### Live charging (`/charging/:id`)
 Battery ring (%), kWh, cost so far, time left, amber warning 5 min before auto-stop, Stop button. Then a summary card → **Pay ₹X** → receipt.

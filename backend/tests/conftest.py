@@ -31,6 +31,11 @@ os.environ.update(
         "GOOGLE_REDIRECT_URI": "http://testserver/auth/google/callback",
         "FRONTEND_URL": "http://localhost:5173",
         "CORS_ORIGINS": "http://localhost:5173",
+        # Phase 4 secrets: fixed fake values, so tests never touch real Razorpay keys.
+        "OTP_SECRET": "test-otp-secret-only-for-tests",
+        "RAZORPAY_KEY_ID": "rzp_test_unit",
+        "RAZORPAY_KEY_SECRET": "test-razorpay-key-secret",
+        "RAZORPAY_WEBHOOK_SECRET": "test-razorpay-webhook-secret",
     }
 )
 # Only this one value is taken from backend/.env.

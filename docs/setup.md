@@ -54,8 +54,22 @@ Copy `backend/.env.example` to `backend/.env` and fill it in. Every variable is 
 | `FRONTEND_URL` | yes | `http://localhost:5173` locally |
 | `CORS_ORIGINS` | no | Defaults to `FRONTEND_URL` |
 | `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | no | Only for the Google redirect sign-in fallback |
+| `OTP_SECRET` | for bookings | Long random string that keys the one-time-code hashes: `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | for payments | Razorpay **test** keys (see "Razorpay test mode" below) |
+| `RAZORPAY_WEBHOOK_SECRET` | for payments | Any long random string; used to check webhook signatures |
+
+The last four are optional at startup: the rest of the API runs without them, and the endpoints that need one answer `503 SETTING_MISSING` naming it.
 
 Ask a teammate for the shared Google client ID. **Never commit `.env` files.**
+
+### Razorpay test mode (booking payments)
+
+1. Sign up free at razorpay.com and switch the dashboard to **Test mode** (no business details or bank account are needed for test keys).
+2. Account & Settings -> API Keys -> **Generate Test Key**. Copy the Key ID (`rzp_test_...`) and the Key Secret (shown once) into `backend/.env`.
+3. Make two random strings for `OTP_SECRET` and `RAZORPAY_WEBHOOK_SECRET`. Razorpay cannot save a webhook without a public URL, so the webhook itself is created in Phase 7; until then bookings are confirmed by the signature check when the payment finishes.
+4. The web app needs **no** Razorpay variable: the API sends the public Key ID with each order. Never put the Key Secret anywhere but `backend/.env`.
+
+**Paying in test mode:** at Razorpay's checkout choose UPI and enter `success@razorpay` (the payment succeeds) or `failure@razorpay` (it fails). For cards use Razorpay's test card `4111 1111 1111 1111` with any future expiry, any CVV, and OTP `1234` where asked. No real money moves.
 
 ### Run
 
@@ -178,7 +192,7 @@ While developing, http://localhost:5173/dev/ui shows every shared UI component i
 ```bash
 npm run build      # type-checks and builds every workspace
 npm run lint       # oxlint
-npm run test:web   # front-end unit tests (the search parser), using Node's built-in test runner
+npm run test:web   # front-end unit tests (search parser, slot selection rules, cost estimate, calendar file), using Node's built-in test runner
 ```
 
 ## 6. Shared API types

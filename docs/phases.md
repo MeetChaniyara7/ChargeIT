@@ -492,6 +492,15 @@ summarise and STOP. Wait for my approval before Phase 4.
 - [ ] An unpaid bill blocks new bookings (using a seeded `DUE` session).
 - [ ] Instant-booking window calculation (with and without a later booking).
 
+**As built (differences from the task list above):**
+- Every endpoint is under `/api` like the rest of the API: `POST /api/bookings`, `POST /api/bookings/instant`, `GET /api/bookings/{id}`, `GET /api/me/bookings`, `POST /api/bookings/{id}/otp`, `POST /api/bookings/{id}/cancel`, `/api/payments/...`, `/api/me/vehicles`.
+- Extra endpoints the screens need: `POST /api/payments/orders` (creates or re-uses the Razorpay order for a held booking; `POST /bookings` itself only holds the slot), `GET /api/bookings/{id}/cancel-preview` (the refund shown before confirming) and `GET /api/me/dues` (unpaid bills, for the banner and the Payment due tab).
+- Errors carry extra facts in `error.details` (the alternatives for `SLOT_TAKEN`, the booking id for `ACTIVE_HOLD_EXISTS`).
+- `BookingOut.server_time` lets the browser count the hold down without trusting its own clock.
+- The API returns the public Razorpay Key ID with each order, so the web app needs no Razorpay variable.
+- Refunds are recorded on the payment and the booking; in test mode no call is made to Razorpay's refund API.
+- `OTP_SECRET` and the `RAZORPAY_*` values are optional at startup; the endpoints that need one answer 503 `SETTING_MISSING`.
+
 ### Done when
 - [ ] You can book a slot, pay with Razorpay's test UPI ID (`success@razorpay`) or a test card, and see the OTP.
 - [ ] Two browsers trying the same slot: one succeeds, the other sees alternatives.

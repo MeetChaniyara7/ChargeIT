@@ -280,6 +280,253 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/vehicles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vehicles */
+        get: operations["list_vehicles_api_me_vehicles_get"];
+        put?: never;
+        /** Add Vehicle */
+        post: operations["add_vehicle_api_me_vehicles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/vehicles/{vehicle_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Vehicle */
+        delete: operations["delete_vehicle_api_me_vehicles__vehicle_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change Vehicle */
+        patch: operations["change_vehicle_api_me_vehicles__vehicle_id__patch"];
+        trace?: never;
+    };
+    "/api/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Booking
+         * @description Hold a slot for 5 minutes. Pay the fee in that time (POST /api/payments/orders) to confirm it.
+         */
+        post: operations["create_booking_api_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/instant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Instant Booking
+         * @description "Charge now" on a free charger: no fee, confirmed at once, the code is in this response (once).
+         */
+        post: operations["create_instant_booking_api_bookings_instant_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{booking_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Booking */
+        get: operations["get_booking_api_bookings__booking_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{booking_id}/otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Show New Code
+         * @description A new one-time code. The old one stops working.
+         */
+        post: operations["show_new_code_api_bookings__booking_id__otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{booking_id}/cancel-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cancel Preview
+         * @description What you would get back if you cancelled right now (nothing changes).
+         */
+        get: operations["cancel_preview_api_bookings__booking_id__cancel_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{booking_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Booking */
+        post: operations["cancel_booking_api_bookings__booking_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Bookings */
+        get: operations["my_bookings_api_me_bookings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/dues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Dues
+         * @description Unpaid energy bills. While there are any, new bookings are refused (UNPAID_BILL).
+         */
+        get: operations["my_dues_api_me_dues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Order
+         * @description The ₹199 booking-fee order for a held booking (the same order again if you ask twice).
+         */
+        post: operations["create_order_api_payments_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Payment
+         * @description Check Razorpay's signature, confirm the booking and return the one-time code (once).
+         */
+        post: operations["verify_payment_api_payments_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webhook
+         * @description Called by Razorpay, not by the browser. The signature covers the raw body, so read it untouched.
+         */
+        post: operations["webhook_api_payments_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -301,6 +548,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * Alternatives
+         * @description What to offer when a slot was just taken. Each entry can be booked in one tap.
+         */
+        Alternatives: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Blocks */
+            blocks: number;
+            /** Same Charger */
+            same_charger: components["schemas"]["SlotAlternative"][];
+            /** Other Chargers */
+            other_chargers: components["schemas"]["ChargerAlternative"][];
+            /** Stations */
+            stations: components["schemas"]["StationAlternative"][];
+        };
         /**
          * AreaSuggestion
          * @description An operator or a city, with how many visible stations it has.
@@ -334,6 +600,150 @@ export interface components {
              * @enum {string}
              */
             state: "FREE" | "BOOKED" | "HELD" | "PAST" | "OUT_OF_SERVICE";
+        };
+        /** BookingCharger */
+        BookingCharger: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Label */
+            label: string;
+            /** Connector Type */
+            connector_type: string;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+        };
+        /** BookingCreate */
+        BookingCreate: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /**
+             * Start
+             * Format: date-time
+             * @description When the slot starts: on a :00 or :30 boundary, in the future, within 7 days
+             */
+            start: string;
+            /**
+             * Blocks
+             * @description How many 30-minute blocks (1-4)
+             */
+            blocks: number;
+            /** Vehicle Id */
+            vehicle_id?: string | null;
+        };
+        /** BookingOut */
+        BookingOut: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Blocks */
+            blocks: number;
+            /** Hold Expires At */
+            hold_expires_at?: string | null;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Booking Fee */
+            booking_fee: number;
+            /** Fee Paid */
+            fee_paid: boolean;
+            /** Refund Amount */
+            refund_amount: number;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Cancel Reason */
+            cancel_reason?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            station: components["schemas"]["BookingStation"];
+            charger: components["schemas"]["BookingCharger"];
+            /**
+             * Code Valid From
+             * Format: date-time
+             */
+            code_valid_from: string;
+            /**
+             * Code Valid Until
+             * Format: date-time
+             */
+            code_valid_until: string;
+            /** Has Code */
+            has_code: boolean;
+            /** Code Used */
+            code_used: boolean;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Show New Code */
+            can_show_new_code: boolean;
+        };
+        /** BookingStation */
+        BookingStation: {
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address: string;
+            /** City */
+            city?: string | null;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+        };
+        /** ChargerAlternative */
+        ChargerAlternative: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Label */
+            label: string;
+            /** Connector Type */
+            connector_type: string;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
         };
         /** ChargerAvailability */
         ChargerAvailability: {
@@ -385,6 +795,31 @@ export interface components {
             /** Estimated Fields */
             estimated_fields?: string[];
         };
+        /** DueItem */
+        DueItem: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Booking Id */
+            booking_id?: string | null;
+            /** Station Name */
+            station_name?: string | null;
+            /** Amount */
+            amount: number;
+            /** Ended At */
+            ended_at?: string | null;
+        };
+        /** DuesOut */
+        DuesOut: {
+            /** Count */
+            count: number;
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["DueItem"][];
+        };
         /** GeocodeResponse */
         GeocodeResponse: {
             /** Query */
@@ -403,6 +838,145 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * InstantBookingOut
+         * @description Returned once when a "Charge now" booking is created: the code is never shown again.
+         */
+        InstantBookingOut: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Blocks */
+            blocks: number;
+            /** Hold Expires At */
+            hold_expires_at?: string | null;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Booking Fee */
+            booking_fee: number;
+            /** Fee Paid */
+            fee_paid: boolean;
+            /** Refund Amount */
+            refund_amount: number;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Cancel Reason */
+            cancel_reason?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            station: components["schemas"]["BookingStation"];
+            charger: components["schemas"]["BookingCharger"];
+            /**
+             * Code Valid From
+             * Format: date-time
+             */
+            code_valid_from: string;
+            /**
+             * Code Valid Until
+             * Format: date-time
+             */
+            code_valid_until: string;
+            /** Has Code */
+            has_code: boolean;
+            /** Code Used */
+            code_used: boolean;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Show New Code */
+            can_show_new_code: boolean;
+            /** Otp */
+            otp: string;
+        };
+        /** InstantCreate */
+        InstantCreate: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Vehicle Id */
+            vehicle_id?: string | null;
+        };
+        /**
+         * OrderOut
+         * @description Everything Razorpay Checkout needs. The amount comes from the server, never from the browser.
+         */
+        OrderOut: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Order Id */
+            order_id: string;
+            /** Amount */
+            amount: number;
+            /** Amount Paise */
+            amount_paise: number;
+            /** Currency */
+            currency: string;
+            /** Key Id */
+            key_id: string;
+            /**
+             * Hold Expires At
+             * Format: date-time
+             */
+            hold_expires_at: string;
+            /** Checkout Timeout Seconds */
+            checkout_timeout_seconds: number;
+        };
+        /** OrderRequest */
+        OrderRequest: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+        };
+        /** OtpOut */
+        OtpOut: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Otp */
+            otp: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /**
+             * Valid Until
+             * Format: date-time
+             */
+            valid_until: string;
+            /**
+             * Note
+             * @default This code is shown once. Showing a new code makes this one stop working.
+             */
+            note: string;
         };
         /** Place */
         Place: {
@@ -452,6 +1026,85 @@ export interface components {
             window_end: string;
             /** Results */
             results: components["schemas"]["Recommendation"][];
+        };
+        /** RefundPreview */
+        RefundPreview: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Fee Paid */
+            fee_paid: number;
+            /** Refund Amount */
+            refund_amount: number;
+            /** Percent */
+            percent: number;
+            /** Reason */
+            reason: string;
+        };
+        /** SlotAlternative */
+        SlotAlternative: {
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+        };
+        /** SlotTakenDetails */
+        SlotTakenDetails: {
+            alternatives: components["schemas"]["Alternatives"];
+        };
+        /** SlotTakenError */
+        SlotTakenError: {
+            /**
+             * Code
+             * @example SLOT_TAKEN
+             */
+            code: string;
+            /** Message */
+            message: string;
+            details: components["schemas"]["SlotTakenDetails"];
+        };
+        /**
+         * SlotTakenResponse
+         * @description The body of the 409 answer when someone else got the slot first. Documents the error for the generated API types.
+         */
+        SlotTakenResponse: {
+            error: components["schemas"]["SlotTakenError"];
+        };
+        /** StationAlternative */
+        StationAlternative: {
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** Distance Km */
+            distance_km: number;
+            /** Travel Minutes */
+            travel_minutes: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Charger Id */
+            charger_id?: string | null;
         };
         /** StationAvailability */
         StationAvailability: {
@@ -713,6 +1366,93 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VehicleIn */
+        VehicleIn: {
+            /**
+             * Nickname
+             * @description e.g. 'Tata Nexon EV'
+             */
+            nickname: string;
+            /**
+             * Connector Type
+             * @enum {string}
+             */
+            connector_type: "CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER";
+            /**
+             * Battery Kwh
+             * @description Usable battery size in kWh
+             */
+            battery_kwh: number;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+        };
+        /** VehicleOut */
+        VehicleOut: {
+            /**
+             * Vehicle Id
+             * Format: uuid
+             */
+            vehicle_id: string;
+            /** Nickname */
+            nickname: string;
+            /** Connector Type */
+            connector_type: ("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER") | string;
+            /** Battery Kwh */
+            battery_kwh: number;
+            /** Is Default */
+            is_default: boolean;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * VehicleUpdate
+         * @description Every field is optional: only the ones sent are changed.
+         */
+        VehicleUpdate: {
+            /** Nickname */
+            nickname?: string | null;
+            /** Connector Type */
+            connector_type?: ("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER") | null;
+            /** Battery Kwh */
+            battery_kwh?: number | null;
+            /** Is Default */
+            is_default?: boolean | null;
+        };
+        /** VerifyOut */
+        VerifyOut: {
+            /** Outcome */
+            outcome: string;
+            booking: components["schemas"]["BookingOut"];
+            /**
+             * Otp
+             * @description Shown ONCE. Null when the code was already issued or the booking was refunded.
+             */
+            otp?: string | null;
+            /**
+             * Refund Amount
+             * @default 0
+             */
+            refund_amount: number;
+            /** Message */
+            message: string;
+        };
+        /** VerifyRequest */
+        VerifyRequest: {
+            /** Razorpay Order Id */
+            razorpay_order_id: string;
+            /** Razorpay Payment Id */
+            razorpay_payment_id: string;
+            /** Razorpay Signature */
+            razorpay_signature: string;
+        };
+        /** WebhookAck */
+        WebhookAck: {
+            /** Status */
+            status: string;
         };
     };
     responses: never;
@@ -1245,6 +1985,480 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuggestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vehicles_api_me_vehicles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleOut"][];
+                };
+            };
+        };
+    };
+    add_vehicle_api_me_vehicles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_vehicle_api_me_vehicles__vehicle_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_vehicle_api_me_vehicles__vehicle_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_booking_api_bookings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description SLOT_TAKEN (with alternatives), ACTIVE_HOLD_EXISTS or UNPAID_BILL */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotTakenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_instant_booking_api_bookings_instant_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstantCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstantBookingOut"];
+                };
+            };
+            /** @description CHARGER_BUSY, NO_ROOM_FOR_INSTANT, UNPAID_BILL or SLOT_TAKEN (with alternatives) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotTakenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_booking_api_bookings__booking_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    show_new_code_api_bookings__booking_id__otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_preview_api_bookings__booking_id__cancel_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_booking_api_bookings__booking_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_bookings_api_me_bookings_get: {
+        parameters: {
+            query?: {
+                scope?: "upcoming" | "past";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_dues_api_me_dues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuesOut"];
+                };
+            };
+        };
+    };
+    create_order_api_payments_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_payment_api_payments_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    webhook_api_payments_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-razorpay-signature"?: string;
+                "x-razorpay-event-id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
                 };
             };
             /** @description Validation Error */

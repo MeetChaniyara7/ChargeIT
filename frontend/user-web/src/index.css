@@ -195,3 +195,25 @@
   background: none;
   border: none;
 }
+
+/* The booking summary bar slides up from the bottom when a selection is made. */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.slide-up {
+  animation: slide-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-up {
+    animation: none;
+  }
+}

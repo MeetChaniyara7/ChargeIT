@@ -6,6 +6,8 @@ export const SLOT_MINUTES = 30;
 export const MIN_BLOCKS_PER_BOOKING = 1;
 export const MAX_BLOCKS_PER_BOOKING = 4;
 export const DISPLAY_TIME_ZONE = 'Asia/Kolkata';
+/** How long a slot is held for payment. Mirrors BOOKING_RULES.payment_hold_minutes in backend/app/config.py. */
+export const PAYMENT_HOLD_SECONDS = 5 * 60;
 
 /** Lifecycle of a booking (see the state diagram in docs/architecture.md section 6.1). */
 export const BOOKING_STATUSES = [

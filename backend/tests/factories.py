@@ -54,7 +54,7 @@ def make_user(db: Session) -> UUID:
 
 def make_booking(
     db: Session, charger_id: UUID, start: datetime, end: datetime, *, status: str = "CONFIRMED",
-    hold_expires_at: datetime | None = None,
+    hold_expires_at: datetime | None = None, user_id: UUID | None = None,
 ) -> UUID:
     """Insert a booking the way the app will: INSTANT bookings may start CONFIRMED, APP bookings start HELD."""
     source = "APP" if status == "HELD" else "INSTANT"
@@ -63,8 +63,28 @@ def make_booking(
             "INSERT INTO bookings (user_id, charger_id, source, status, time_range, hold_expires_at) "
             "VALUES (:u, :c, :src, :st, tstzrange(:s, :e, '[)'), :h) RETURNING booking_id"
         ),
-        {"u": make_user(db), "c": charger_id, "src": source, "st": status, "s": start, "e": end, "h": hold_expires_at},
+        {"u": user_id or make_user(db), "c": charger_id, "src": source, "st": status, "s": start, "e": end, "h": hold_expires_at},
     ).scalar_one()
 
 
 HOUR = timedelta(hours=1)
+
+
+def make_due_bill(db: Session, user_id: UUID, charger_id: UUID, amount: float = 223.20) -> UUID:
+    """An unpaid energy bill: a finished charging session for one of the user's bookings."""
+    booking_id = db.execute(
+        text(
+            "INSERT INTO bookings (user_id, charger_id, source, status, time_range) "
+            "VALUES (:u, :c, 'INSTANT', 'CONFIRMED', tstzrange(now() - interval '4 hours', now() - interval '3 hours', '[)')) RETURNING booking_id"
+        ),
+        {"u": user_id, "c": charger_id},
+    ).scalar_one()
+    db.execute(text("UPDATE bookings SET status = 'ACTIVE' WHERE booking_id = :b"), {"b": booking_id})
+    db.execute(text("UPDATE bookings SET status = 'COMPLETED' WHERE booking_id = :b"), {"b": booking_id})
+    return db.execute(
+        text(
+            "INSERT INTO charging_sessions (booking_id, charger_id, source, started_at, ended_at, energy_kwh, bill_amount, bill_status) "
+            "VALUES (:b, :c, 'BOOKING', now() - interval '4 hours', now() - interval '3 hours', 12.4, :amt, 'DUE') RETURNING session_id"
+        ),
+        {"b": booking_id, "c": charger_id, "amt": amount},
+    ).scalar_one()

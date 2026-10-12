@@ -8,6 +8,9 @@ import { LandingPage } from '../features/home/LandingPage';
 import { ExplorePage } from '../features/stations/ExplorePage';
 import { StationPage } from '../features/stations/StationPage';
 import { BookingsPage } from '../features/bookings/BookingsPage';
+import { HoldPage } from '../features/bookings/HoldPage';
+import { ReceiptPage } from '../features/bookings/ReceiptPage';
+import { TicketPage } from '../features/bookings/TicketPage';
 import { ChargingPage } from '../features/charging/ChargingPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { VehiclesPage } from '../features/profile/VehiclesPage';
@@ -51,7 +54,10 @@ export const App: React.FC = () => {
             >
               <Route path="/explore" element={<ExplorePage />} />
               <Route path="/stations/:stationId" element={<StationPage />} />
-              <Route path="/bookings"element={<BookingsPage />} />
+              <Route path="/bookings" element={<BookingsPage />} />
+              <Route path="/book/:bookingId" element={<HoldPage />} />
+              <Route path="/tickets/:bookingId" element={<TicketPage />} />
+              <Route path="/receipts/:bookingId" element={<ReceiptPage />} />
               <Route path="/charging" element={<ChargingPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/vehicles" element={<VehiclesPage />} />

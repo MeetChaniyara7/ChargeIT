@@ -37,6 +37,12 @@ class Settings:
     google_redirect_uri: str | None
     frontend_url: str
     cors_origins: tuple[str, ...]
+    # Phase 4. Optional at startup so the rest of the API runs without them; the code that
+    # needs one asks for it with require_setting() and answers 503 if it is missing.
+    otp_secret: str | None = None
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    razorpay_webhook_secret: str | None = None
 
     @property
     def cookies_secure(self) -> bool:
@@ -70,6 +76,10 @@ class Settings:
             google_redirect_uri=get("GOOGLE_REDIRECT_URI"),
             frontend_url=frontend_url,
             cors_origins=cors_origins,
+            otp_secret=get("OTP_SECRET"),
+            razorpay_key_id=get("RAZORPAY_KEY_ID"),
+            razorpay_key_secret=get("RAZORPAY_KEY_SECRET"),
+            razorpay_webhook_secret=get("RAZORPAY_WEBHOOK_SECRET"),
         )
 
 
@@ -106,6 +116,7 @@ class BookingRules:
     end_of_slot_warning: int = 5
     buffer_before_next_booking: int = 5
     instant_booking_max_minutes: int = 120
+    instant_min_minutes: int = 15  # "Charge now" needs at least this much free time before the next booking
     walkin_amounts_inr: tuple[int, ...] = (100, 200, 500)
     # Checked top to bottom: the first tier the cancellation qualifies for wins.
     refund_tiers: tuple[RefundTier, ...] = (
@@ -122,6 +133,10 @@ class BookingRules:
     recommendation_radius_km: float = 15.0
     duplicate_station_distance_m: float = 50.0
     display_timezone: str = "Asia/Kolkata"
+    max_vehicles_per_user: int = 10
+    # How far either side of a requested start we look for other free times on the same charger.
+    alternative_search_hours: int = 3
+    max_alternatives_per_group: int = 3
 
 
 BOOKING_RULES = BookingRules()
@@ -200,3 +215,13 @@ RECOMMENDATION_WEIGHTS = RecommendationWeights()
 RECOMMENDATION_RULES = RecommendationRules()
 EXTERNAL_SERVICES = ExternalServices()
 SEARCH_RULES = SearchRules()
+
+
+def require_setting(name: str) -> str:
+    """A Phase 4 secret (OTP_SECRET, RAZORPAY_*), or a clear 503 if it was never set."""
+    from app.core.errors import AppError  # imported here: errors.py must stay free of config
+
+    value = getattr(get_settings(), name.lower())
+    if not value:
+        raise AppError(503, "SETTING_MISSING", f"The server is missing {name.upper()}. Set it in backend/.env.")
+    return value
