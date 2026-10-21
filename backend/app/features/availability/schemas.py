@@ -11,7 +11,8 @@ from pydantic import BaseModel
 # HELD         someone is paying for it right now (frees up if they don't finish)
 # PAST         the slot is over
 # OUT_OF_SERVICE  the charger is broken or switched off
-BlockState = Literal["FREE", "BOOKED", "HELD", "PAST", "OUT_OF_SERVICE"]
+# BUSY_EXTERNAL   someone is charging with the operator's own app or card right now (only the current block)
+BlockState = Literal["FREE", "BOOKED", "HELD", "PAST", "OUT_OF_SERVICE", "BUSY_EXTERNAL"]
 
 
 class AvailabilityBlock(BaseModel):

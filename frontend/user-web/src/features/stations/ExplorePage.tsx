@@ -22,6 +22,7 @@ import { useGeolocation } from './useGeolocation';
 import { useLoosenFilter } from './useLoosenFilter';
 import { useRecentSearches } from './useRecentSearches';
 import { useVehicles } from '../profile/useVehicles';
+import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { useRecommendations } from './useRecommendations';
 import { suggestUrl, useSearchSuggest } from './useSearchSuggest';
 import { useStations } from './useStations';
@@ -94,6 +95,11 @@ export const ExplorePage: React.FC = () => {
   const stationQuery = useStations(bounds, reference, filters);
   const recs = useRecommendations(reference, filters.connectors);
   const suggest = useSearchSuggest(parsed.text, reference, searchOpen);
+
+  // Live updates for the nearest stations on screen (a channel each, so not hundreds): when one changes,
+  // ask the API again. Pins whose free count changed flash. Stations further down the list refresh by polling.
+  const nearestIds = stationQuery.stations.slice(0, 20).map((s) => s.station_id);
+  useRealtimeRefresh(nearestIds, stationQuery.refresh);
 
   const noResults = !stationQuery.loading && !stationQuery.error && stationQuery.stations.length === 0;
   const loosen = useLoosenFilter(stationQuery.settledBounds, reference, filters, noResults && hasFilters);

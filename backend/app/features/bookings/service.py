@@ -26,6 +26,7 @@ from app.features.bookings.schemas import (
     BookingCharger, BookingOut, BookingStation, DueItem, DuesOut, InstantBookingOut, OtpOut, RefundPreview,
 )
 from app.features.charging.models import ChargingSession
+from app.features.jobs.lazy import run_due_jobs, run_for_stations
 from app.features.payments.models import Payment
 from app.features.stations.models import Charger, Station
 from app.features.vehicles import service as vehicles
@@ -74,7 +75,7 @@ def booking_payment(db: Session, booking_id: UUID) -> Payment | None:
     )
 
 
-def to_out(booking: Booking, payment: Payment | None, now: datetime) -> BookingOut:
+def to_out(booking: Booking, payment: Payment | None, now: datetime, session_id: UUID | None = None) -> BookingOut:
     charger = booking.charger
     station = charger.station
     status = effective_status(booking, now)
@@ -99,7 +100,15 @@ def to_out(booking: Booking, payment: Payment | None, now: datetime) -> BookingO
         code_used=booking.otp_used_at is not None,
         can_cancel=status in ("HELD", "CONFIRMED"),
         can_show_new_code=status == "CONFIRMED" and booking.otp_used_at is None and as_utc(now) <= closes,
+        notice_kind=booking.notice_kind, notice_text=booking.notice_text, session_id=session_id,
     )
+
+
+def sessions_by_booking(db: Session, booking_ids: list[UUID]) -> dict[UUID, UUID]:
+    """booking id -> its charging session id, for the bookings that have started charging (one query)."""
+    if not booking_ids:
+        return {}
+    return dict(db.execute(select(ChargingSession.booking_id, ChargingSession.session_id).where(ChargingSession.booking_id.in_(booking_ids))).all())
 
 
 def get_owned(db: Session, user_id: UUID, booking_id: UUID, *, lock: bool = False) -> Booking:
@@ -113,13 +122,20 @@ def get_owned(db: Session, user_id: UUID, booking_id: UUID, *, lock: bool = Fals
 
 
 def get_booking(db: Session, user_id: UUID, booking_id: UUID, now: datetime) -> BookingOut:
+    run_due_jobs(db, now, get_owned(db, user_id, booking_id).charger.station_id)  # lazy checks: moves, no-shows, auto-stops
     booking = get_owned(db, user_id, booking_id, lock=True)
     expire_if_stale(db, booking, now)
-    return to_out(booking, booking_payment(db, booking.booking_id), now)
+    session = sessions_by_booking(db, [booking.booking_id]).get(booking.booking_id)
+    return to_out(booking, booking_payment(db, booking.booking_id), now, session)
 
 
 def my_bookings(db: Session, user_id: UUID, scope: str, now: datetime, limit: int = 100) -> list[BookingOut]:
     """Upcoming: still holding a charger and not over. Past: everything else."""
+    # Lazy checks first, for the stations this driver has live bookings at, so what they see is right.
+    run_for_stations(db, now, db.scalars(
+        select(Charger.station_id).join(Booking, Booking.charger_id == Charger.charger_id)
+        .where(Booking.user_id == user_id, Booking.status.in_(LIVE)).distinct()
+    ))
     still_live = and_(
         Booking.status.in_(LIVE),
         func.upper(Booking.time_range) > now,
@@ -139,7 +155,8 @@ def my_bookings(db: Session, user_id: UUID, scope: str, now: datetime, limit: in
             .order_by(Payment.created_at)
         ):
             payments[p.booking_id] = p  # the newest wins
-    return [to_out(b, payments.get(b.booking_id), now) for b in bookings]
+    sessions = sessions_by_booking(db, [b.booking_id for b in bookings])
+    return [to_out(b, payments.get(b.booking_id), now, sessions.get(b.booking_id)) for b in bookings]
 
 
 def unpaid_bills(db: Session, user_id: UUID) -> DuesOut:
@@ -282,6 +299,7 @@ def create_hold(
     end = start + blocks * SLOT
 
     charger = _charger_for_booking(db, charger_id)
+    run_due_jobs(db, now, charger.station_id)  # lazy checks before looking at what is free
     _check_vehicle(db, user_id, vehicle_id, charger)
 
     booking = None
@@ -327,7 +345,11 @@ def create_hold(
 def create_instant(db: Session, user_id: UUID, charger_id: UUID, vehicle_id: UUID | None, now: datetime) -> InstantBookingOut:
     """"Charge now": from this moment until the next booking (minus a buffer) or 2 hours. No fee."""
     charger = _charger_for_booking(db, charger_id)
-    if charger.status != "AVAILABLE":
+    run_due_jobs(db, now, charger.station_id)
+    db.refresh(charger)  # the jobs may have changed its status
+    # RESERVED only means a booking is about to start (the lock begins 15 minutes ahead); whether there is
+    # room before it is decided below. Anything else (charging, broken) is busy.
+    if charger.status not in ("AVAILABLE", "RESERVED"):
         raise AppError(409, "CHARGER_BUSY", "This charger is in use right now.")
     _check_vehicle(db, user_id, vehicle_id, charger)
 

@@ -161,8 +161,21 @@ Tabs **Upcoming · Past · Payment due** (count badge, `?tab=due`). Each booking
 ### Vehicles (`/profile/vehicles`)
 List with the default marked; add and edit in a sheet (name, plug picked with its icon, battery kWh), remove with a confirm, make default. The default vehicle sets the Explore plug filter once per session (only when no filter is chosen) and the battery limit on cost estimates.
 
-### Live charging (`/charging/:id`)
-Battery ring (%), kWh, cost so far, time left, amber warning 5 min before auto-stop, Stop button. Then a summary card → **Pay ₹X** → receipt.
+### Live charging (`/charging/:sessionId`)
+A large battery ring (the ONE glowing element in the app; it breathes while charging and the glow is switched off by "reduce motion") with the charge % in the middle; under it **Energy (kWh)**, **Cost so far** and **Time left** in fixed-width digits. The numbers come from the API, refresh on a live nudge and every 15 seconds, and glide to each new value. The countdown uses the server's clock.
+- **Warning:** inside the last 5 minutes an amber banner says *"Stops at 5:30 PM, next booking waiting."* (or *"..., when your booked time ends."*).
+- **Stop charging** opens a sheet that shows the energy and cost so far; Stop now bills up to that moment.
+- **Ended** (you stopped, the slot ended, it was unplugged, or the charger faulted): a summary card with why, energy, time, rate and total, a disabled **Pay ₹X** (payment arrives in the next update, and an unpaid bill blocks new bookings), and a link to Bookings.
+- States: loading skeleton, "Session not found", an error with Try again, and the global "Reconnecting..." banner.
+
+### The Charging tab and the app bar
+While the driver is charging, the Charging tab has a pulsing green dot and opens the live page, and the app bar shows a pill, **Charging · 68%**, on every screen. With nothing running the tab says "No charging right now" and points to the map.
+
+### Live updates
+The station grid, the Explore pins, the Bookings list and the ticket refresh by themselves. Blocks and pins that changed flash once (nothing flashes under "reduce motion"). The grid also shows **Busy (other app)** for the current block while someone charges with the operator's own app. If live updates drop, the banner says "Reconnecting..." and the screens poll every 30 seconds.
+
+### When the charger is busy at the start
+A booking that was **moved** shows a highlighted *"Your booking moved: Moved from CCS2-1 to CCS2-2, same time."* on its card and ticket, and a toast if the app is open. A **warning** appears when an outside driver is still charging as the lock time arrives. A booking **cancelled** because no charger was free shows *"Your booking was cancelled"* with the full refund and three nearby alternatives from the recommendation engine.
 
 ---
 

@@ -561,20 +561,20 @@ Phase 5.
 - [ ] `EXTERNAL_START` during a reservation lock is **rejected**, just as a real reserved charger would refuse.
 - [ ] Outside sessions are recorded as `charging_sessions` with `source = EXTERNAL`, and availability shows `BUSY_EXTERNAL` for the current block.
 
-**5.3 Job functions: migration `009_jobs.sql`**
+**5.3 Job functions: migration `011_jobs.sql`** (planned as `009`; 009 and 010 were already taken)
 - [ ] `expire_holds(p_now)`, `apply_reservation_locks(p_now)`, `resolve_occupied_starts(p_now)`, `mark_no_shows(p_now)`, `auto_stop_sessions(p_now)`, exactly as described in `architecture.md` section 10.
 - [ ] Every function takes `p_now timestamptz DEFAULT now()` so tests can pretend it's any time.
 - [ ] They change bookings only through legal transitions (the trigger enforces this) with actor `SYSTEM`.
 - [ ] `resolve_occupied_starts`: move the booking to another free compatible charger at the same station, otherwise cancel with a **100% refund**.
 - [ ] `auto_stop_sessions`: stops at slot end, and calculates `bill_amount` with `bill_status = DUE` for app and instant sessions.
 
-**5.4 Schedule: migration `010_cron.sql`**
+**5.4 Schedule: migration `012_cron.sql`** (planned as `010`)
 - [ ] `cron.schedule` runs each job **every minute** (only when `pg_cron` exists).
 
 **5.5 Lazy checks in the API**
 - [ ] One helper runs the relevant checks for a charger or station before availability, booking and session reads, so results are right even if a job hasn't run yet.
 
-**5.6 Realtime: migration `011_realtime.sql` and the web app**
+**5.6 Realtime: migration `013_realtime.sql` and the web app** (planned as `011`)
 - [ ] Triggers on `bookings`, `chargers` and `charging_sessions` send a small message (`{station_id, charger_id}`) to the topic `station:<id>` using Supabase `realtime.send`. **No booking details in the message.**
 - [ ] Web app `lib/realtime.ts`: subscribe to the stations on screen and **re-fetch from the API** when nudged. If realtime fails, fall back to polling every 30 seconds.
 - [ ] Availability grids, the map and My Bookings update live.
@@ -592,6 +592,17 @@ Phase 5.
 - [ ] Occupied at start → moved to another charger; no charger free → cancelled with a 100% refund.
 - [ ] Auto-stop at slot end with the correct bill.
 - [ ] Python and SQL energy formulas match.
+
+**As built (differences from the task list above):**
+- The migrations are `011_jobs.sql`, `012_cron.sql` and `013_realtime.sql` (009 and 010 were already used by row-level security and search). `012` enables `pg_cron` and does nothing on a database without it.
+- One cron entry, `chargespot-jobs`, runs `run_due_jobs()` every minute. It calls the five job functions in the order that gives the right answer (expire holds, resolve occupied starts, no-shows, auto-stop, reservation locks). Each job still takes `p_now` and an optional station, and can be called alone.
+- The lazy checks (`features/jobs/lazy.py`) run `run_due_jobs` for the station involved before availability, booking and session reads. If they fail, the read carries on.
+- The energy formula multiplies first and divides last in both Python and SQL; a 20,000-case random comparison found no difference. Shared numbers sit in the `job_rules` table, and a test checks it equals `config.py`.
+- Booking notices (moved / warned / cancelled for lack of a charger) are stored on the booking (`notice_kind`, `notice_text`, `moved_from_charger_id`).
+- The availability grid has a `BUSY_EXTERNAL` block state for the current block while an outside session runs.
+- Extra endpoints: `GET /api/me/sessions/active` (the Charging tab and app-bar pill), `POST /api/admin/bookings/{id}/start` (stands in for the kiosk until Phase 6). `python -m scripts.simulate` runs the simulator and the jobs from the command line without a login token; `python -m scripts.make_admin` makes an account an admin.
+- Walk-in sessions (Phase 6) are already handled by `auto_stop_sessions`: they stop 5 minutes before the next booking or when the prepaid amount is used up.
+- A realtime nudge goes to `station:<id>` with only `{station_id, charger_id}`. The web app reads nothing else from it.
 
 ### Done when
 - [ ] Without touching anything: an unpaid hold disappears after 5 min, a booking with no OTP becomes `NO_SHOW` at +10 min, and a session stops at slot end.

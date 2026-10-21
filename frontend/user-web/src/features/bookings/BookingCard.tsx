@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { KeyRound, MapPin, Navigation, Receipt, Ticket, X } from 'lucide-react';
+import { BatteryCharging, KeyRound, MapPin, Navigation, Receipt, Ticket, X } from 'lucide-react';
 import { Button, buttonClasses, Card, Money } from '../../components/ui';
 import { directionsUrl } from '../stations/directions';
 import { formatSlot } from './format';
+import { NoticeBanner } from './NoticeBanner';
 import { StatusTimeline } from './StatusTimeline';
 import type { BookingOut } from './types';
 
@@ -41,6 +42,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onN
           {booking.charger.power_kw ? ` · ${booking.charger.power_kw} kW` : ''}
           {booking.source === 'INSTANT' ? ' · Charge now' : ''}
         </p>
+        <NoticeBanner kind={booking.notice_kind} text={booking.notice_text} />
         <StatusTimeline status={booking.status} />
         {booking.refund_amount > 0 && (
           <p className="text-sm text-muted">
@@ -50,6 +52,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onN
       </div>
 
       <div className="flex flex-wrap gap-2 border-t border-dashed border-field-border bg-raised/40 p-3">
+        {booking.status === 'ACTIVE' && booking.session_id && (
+          <Link to={`/charging/${booking.session_id}`} className={buttonClasses({ size: 'sm' })}>
+            <BatteryCharging className="size-4" aria-hidden="true" />
+            Charging now
+          </Link>
+        )}
         {live && booking.status === 'HELD' && (
           <Link to={`/book/${booking.booking_id}`} className={buttonClasses({ size: 'sm' })}>
             Finish paying

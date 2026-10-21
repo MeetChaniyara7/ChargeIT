@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import { chooseBlock, dragBlocks, dragPreview, GAP, indexesOf, MAX_BLOCKS, TOO_MANY } from '../src/features/stations/selection.ts';
 import type { Selection } from '../src/features/stations/selection.ts';
 
-type State = 'FREE' | 'BOOKED' | 'HELD' | 'PAST' | 'OUT_OF_SERVICE';
+type State = 'FREE' | 'BOOKED' | 'HELD' | 'PAST' | 'OUT_OF_SERVICE' | 'BUSY_EXTERNAL';
 
 const HALF_HOUR = 30 * 60 * 1000;
 const T0 = Date.UTC(2026, 9, 12, 0, 0);
@@ -76,11 +76,11 @@ describe('tapping blocks', () => {
 });
 
 describe('blocks that cannot be chosen', () => {
-  const states: State[] = ['PAST', 'FREE', 'FREE', 'BOOKED', 'FREE', 'HELD', 'FREE', 'OUT_OF_SERVICE'];
+  const states: State[] = ['PAST', 'FREE', 'FREE', 'BOOKED', 'FREE', 'HELD', 'FREE', 'OUT_OF_SERVICE', 'BUSY_EXTERNAL'];
   const c = charger('A', states);
 
   test('each state gives its own short reason', () => {
-    const reasons = [0, 3, 5, 7].map((i) => {
+    const reasons = [0, 3, 5, 7, 8].map((i) => {
       const r = chooseBlock(null, c, i);
       assert.equal(r.ok, false);
       return r.ok ? '' : r.message;
@@ -89,6 +89,7 @@ describe('blocks that cannot be chosen', () => {
     assert.match(reasons[1], /already booked/);
     assert.match(reasons[2], /paying/);
     assert.match(reasons[3], /out of service/);
+    assert.match(reasons[4], /another driver|operator/i);
   });
 
   test('a range that would cross a booked block is refused', () => {

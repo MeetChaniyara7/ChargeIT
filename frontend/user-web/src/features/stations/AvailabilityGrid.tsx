@@ -16,6 +16,8 @@ const STATE_CLASS: Record<BlockState | 'SELECTED', string> = {
   HELD: 'border border-warning/60 bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-warning)_55%,transparent)_0_3px,transparent_3px_7px)]',
   PAST: 'bg-raised/50 opacity-50',
   OUT_OF_SERVICE: 'border border-danger/50 bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--color-danger)_55%,transparent)_0_2px,transparent_2px_6px)]',
+  // Dots: someone is charging with the operator's own app or card right now.
+  BUSY_EXTERNAL: 'border border-info/60 bg-info/10 bg-[radial-gradient(circle,color-mix(in_srgb,var(--color-info)_80%,transparent)_1.6px,transparent_2px)] bg-[length:7px_7px]',
   SELECTED: 'border-2 border-primary bg-primary shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-primary)_35%,transparent)]',
 };
 
@@ -25,6 +27,7 @@ const STATE_WORD: Record<BlockState, string> = {
   HELD: 'held while someone pays',
   PAST: 'past',
   OUT_OF_SERVICE: 'out of service',
+  BUSY_EXTERNAL: 'busy with another app',
 };
 
 const LEGEND: { state: BlockState | 'SELECTED'; label: string }[] = [
@@ -34,6 +37,7 @@ const LEGEND: { state: BlockState | 'SELECTED'; label: string }[] = [
   { state: 'HELD', label: 'Held' },
   { state: 'PAST', label: 'Past' },
   { state: 'OUT_OF_SERVICE', label: 'Out of service' },
+  { state: 'BUSY_EXTERNAL', label: 'Busy (other app)' },
 ];
 
 const hourLabel = (hour: number) => (hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`);
@@ -48,6 +52,8 @@ export interface AvailabilityGridProps {
   onSelectionChange?: (selection: Selection | null) => void;
   /** Called with a short reason when a tap or drag is not allowed ("That block is already booked."). */
   onInvalid?: (message: string) => void;
+  /** Blocks that just changed on their own (a live update), as "chargerId|blockStart": they flash briefly. */
+  changed?: ReadonlySet<string>;
   /** Extra content under a charger's name, e.g. a "Charge now" button. */
   rowAction?: (charger: ChargerAvailability) => React.ReactNode;
 }
@@ -61,7 +67,7 @@ export interface AvailabilityGridProps {
  * Enter or Space picks. 1 to 4 adjacent free blocks on one charger; anything else says why.
  * The charger names stay in view while you scroll sideways, and a line marks "now" on today.
  */
-export const AvailabilityGrid: React.FC<AvailabilityGridProps> = ({ availability, selection = null, onSelectionChange, onInvalid, rowAction }) => {
+export const AvailabilityGrid: React.FC<AvailabilityGridProps> = ({ availability, selection = null, onSelectionChange, onInvalid, changed, rowAction }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cellRefs = useRef(new Map<string, HTMLButtonElement>());
   const firstBlock = availability.chargers[0]?.blocks[0];
@@ -207,7 +213,7 @@ export const AvailabilityGrid: React.FC<AvailabilityGridProps> = ({ availability
                       const range = `${formatTimeIST(block.start)} to ${formatTimeIST(block.end)}`;
                       const chosen = (picked && column >= picked[0] && column <= picked[1]) || (preview && column >= preview[0] && column <= preview[1]);
                       const description = `${charger.label}, ${range}, ${chosen ? 'your pick' : STATE_WORD[block.state]}`;
-                      const swatch = cx('h-10 w-full rounded', STATE_CLASS[chosen ? 'SELECTED' : block.state]);
+                      const swatch = cx('h-10 w-full rounded', STATE_CLASS[chosen ? 'SELECTED' : block.state], changed?.has(`${charger.charger_id}|${block.start}`) && 'changed-flash');
                       return (
                         <td key={block.start} role={interactive ? 'gridcell' : undefined} aria-selected={interactive ? !!chosen : undefined} className="p-0.5">
                           {interactive ? (

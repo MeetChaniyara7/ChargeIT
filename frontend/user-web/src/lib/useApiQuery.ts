@@ -17,7 +17,10 @@ export interface QueryResult<T> {
   refreshing: boolean;
   /** A message when the latest request failed. */
   error: string | null;
+  /** Try again from scratch: shows the loading state (for a "Try again" button). */
   retry: () => void;
+  /** Ask again quietly: the current data stays on screen and is swapped when the new answer arrives (live updates, polling). */
+  refresh: () => void;
 }
 
 /**
@@ -52,6 +55,8 @@ export function useApiQuery<T>(key: string | null, fetcher: (signal: AbortSignal
     setAttempt((n) => n + 1);
   }, []);
 
+  const refresh = useCallback(() => setAttempt((n) => n + 1), []);
+
   const settled = state.key === key;
   const waiting = key !== null && !settled;
   return {
@@ -60,5 +65,6 @@ export function useApiQuery<T>(key: string | null, fetcher: (signal: AbortSignal
     refreshing: waiting && state.data !== undefined,
     error: settled ? state.error : null,
     retry,
+    refresh,
   };
 }

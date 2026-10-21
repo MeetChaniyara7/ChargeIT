@@ -149,9 +149,16 @@ export const StationMap: React.FC<StationMapProps> = ({
         marker.addTo(layer);
         pins.set(id, { marker, key });
       } else if (existing.key !== key) {
+        // The free count changed (not just which pin is selected): flash the pin so the change is noticed.
+        const countsChanged = existing.key.slice(0, existing.key.lastIndexOf('/')) !== key.slice(0, key.lastIndexOf('/'));
         existing.marker.setIcon(pinIcon(station, selected));
         existing.marker.setZIndexOffset(selected ? 1000 : 0);
         existing.key = key;
+        if (countsChanged) {
+          const element = existing.marker.getElement();
+          element?.classList.add('pin-pulse');
+          window.setTimeout(() => element?.classList.remove('pin-pulse'), 2400);
+        }
       }
     }
 

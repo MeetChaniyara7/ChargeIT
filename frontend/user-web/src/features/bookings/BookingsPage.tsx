@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertCircle, RefreshCw, Ticket, Wallet } from 'lucide-react';
 import { buttonClasses, Button, Card, DateTime, EmptyState, Money, SkeletonBlock, TabPanel, Tabs } from '../../components/ui';
+import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { BookingCard } from './BookingCard';
 import { CancelSheet, NewCodeSheet } from './BookingSheets';
 import type { BookingOut, BookingScope } from './types';
+import { useNoticeToasts } from './useNoticeToasts';
 import { useDues, useMyBookings } from './useBookings';
 
 type Tab = BookingScope | 'due';
@@ -17,6 +19,11 @@ const BookingList: React.FC<{
   refreshKey: number;
 }> = ({ scope, onCancel, onNewCode, refreshKey }) => {
   const query = useMyBookings(scope);
+  // Live updates for the stations of upcoming bookings (a booking moved, a no-show, charging started...),
+  // and a toast when a notice appears while this page is open.
+  const stationIds = useMemo(() => (scope === 'upcoming' ? (query.data ?? []).map((b) => b.station.station_id).slice(0, 10) : []), [scope, query.data]);
+  useRealtimeRefresh(stationIds, query.refresh);
+  useNoticeToasts(query.data);
   // After a cancellation the parent bumps refreshKey; ask the server again.
   const [seenKey, setSeenKey] = useState(refreshKey);
   if (seenKey !== refreshKey) {

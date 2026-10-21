@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Clock, MapPin, Navigation, RefreshCw, Share2, Star, Zap } from 'lucide-react';
 import { estimateEnergy, formatRelativeIST, istDateKey } from '@chargespot/shared';
@@ -7,6 +7,8 @@ import {
   StatusBadge, TabPanel, Tabs, useToast,
 } from '../../components/ui';
 import { ApiError, apiFetch } from '../../lib/api';
+import { useChanged } from '../../lib/useChanged';
+import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { formatSlot } from '../bookings/format';
 import type { Alternatives, BookingOut, InstantBookingOut, TicketState } from '../bookings/types';
 import { useDues } from '../bookings/useBookings';
@@ -160,6 +162,20 @@ export const StationPage: React.FC = () => {
   const [selection, setSelection] = useState<Selection | null>(initial.selection);
   const availability = useAvailability(stationId, day);
 
+  // Live updates: when anything at this station changes, ask the API again (the message itself is never trusted).
+  const refreshDetail = detail.refresh;
+  const refreshAvailability = availability.refresh;
+  useRealtimeRefresh(stationId ? [stationId] : [], () => {
+    refreshDetail();
+    refreshAvailability();
+  });
+  // Blocks that changed on their own flash briefly (switching day is not a change).
+  const snapshot = useMemo(
+    () => (availability.data ? new Map(availability.data.chargers.flatMap((c) => c.blocks.map((b): [string, string] => [`${c.charger_id}|${b.start}`, b.state]))) : null),
+    [availability.data],
+  );
+  const changed = useChanged(snapshot, day);
+
   const [notice, setNotice] = useState<{ message: string; holdId?: string } | null>(null);
   const [holding, setHolding] = useState(false);
   const [alternatives, setAlternatives] = useState<Alternatives | null>(null);
@@ -231,6 +247,11 @@ export const StationPage: React.FC = () => {
           powerKw: pickedCharger.power_kw, pricePerKwh: pickedCharger.price_per_kwh, minutes: selection.blocks * 30, batteryKwh: vehicle?.battery_kwh,
         })
       : null;
+  // A live update may have given part of the picked time to someone else.
+  const pickRow = selection ? availability.data?.chargers.find((c) => c.charger_id === selection.chargerId) : undefined;
+  const pickTaken =
+    !!selection && !!pickRow &&
+    pickRow.blocks.some((b) => b.start >= selection.startIso && b.end <= selection.endIso && b.state !== 'FREE');
   const vehicleNote = vehicle
     ? `Estimate uses your ${vehicle.nickname} (${vehicle.battery_kwh} kWh battery).`
     : defaultVehicle && pickedCharger
@@ -255,7 +276,7 @@ export const StationPage: React.FC = () => {
         setNotice({ message: 'Something went wrong. Please try again.' });
       } else if (error.code === 'SLOT_TAKEN') {
         setAlternatives((error.details?.alternatives as Alternatives | undefined) ?? { charger_id: chargerId, blocks, same_charger: [], other_chargers: [], stations: [] });
-        availability.retry(); // show what is free now
+        availability.refresh(); // show what is free now
       } else if (error.code === 'ACTIVE_HOLD_EXISTS') {
         setNotice({ message: error.message, holdId: (error.details?.booking_id as string | undefined) });
       } else if (error.code === 'UNPAID_BILL') {
@@ -286,7 +307,7 @@ export const StationPage: React.FC = () => {
     } catch (error) {
       if (error instanceof ApiError && error.code === 'UNPAID_BILL') dues.retry();
       setChargeNowError(error instanceof ApiError ? error.message : 'Something went wrong. Please try again.');
-      detail.retry(); // the charger may no longer be free
+      detail.refresh(); // the charger may no longer be free
     } finally {
       setChargeNowBusy(false);
     }
@@ -350,6 +371,7 @@ export const StationPage: React.FC = () => {
                 <AvailabilityGrid
                   availability={availability.data}
                   selection={selection}
+                  changed={changed}
                   onSelectionChange={(next) => (unpaid ? setNotice({ message: 'Pay your pending bill before booking again.' }) : changeSelection(next))}
                   onInvalid={(message) => setNotice({ message })}
                   rowAction={(charger) =>
@@ -396,7 +418,7 @@ export const StationPage: React.FC = () => {
           estimate={estimate}
           vehicleNote={vehicleNote}
           loading={holding}
-          disabledReason={unpaid ? 'Pay your pending bill before booking again.' : undefined}
+          disabledReason={unpaid ? 'Pay your pending bill before booking again.' : pickTaken ? 'Part of your pick was just taken. Choose again.' : undefined}
           onConfirm={() => void hold(selection.chargerId, selection.startIso, selection.blocks)}
           onClear={() => changeSelection(null)}
         />

@@ -25,6 +25,7 @@ This document records **what we are building and why**. It is the reference for 
 15. [Configuration values](#15-configuration-values)
 16. [Free services and their limits](#16-free-services-and-their-limits)
 17. [Build phases and team split](#17-build-phases-and-team-split)
+18. [What is built today (code-derived)](#18-what-is-built-today-code-derived)
 
 ---
 
@@ -152,18 +153,19 @@ backend/
   app/features/
     auth/                        Google + email login, JWT, require_admin
     stations/                    station search by map area or radius
-    availability/                30-minute slot grid per charger
+    availability/                30-minute slot grid per charger, `occupancy.py` ("is it free?")
     recommendations/             scoring.py (pure functions), osrm.py
     search/                      search suggestions (stations, operators, cities) via pg_trgm
     bookings/                    state_machine.py, otp.py, refunds.py, service.py, repository.py
     payments/                    Razorpay orders, signature check, webhook, refunds
-    charging/                    sessions, simulated energy meter, billing
-    kiosk/                       device auth, OTP start, walk-in start, rate limits
-    chargers/                    charger simulator (fake OCPP events)
+    charging/                    sessions: live numbers, stop, start; energy.py (the energy formula); billing
+    kiosk/                       device auth, OTP start, walk-in start, rate limits  (PLANNED, Phase 6: not built)
+    chargers/                    charger simulator (fake OCPP events), admin endpoint
+    jobs/                        lazy checks: runs the SQL background jobs for a station before a read
     geocoding/                   Nominatim proxy + cache
     vehicles/                    the user's vehicles
-    admin/                       station/charger editing, reports, alerts
-  scripts/                       admin helpers, e.g. make_admin.py
+    admin/                       station/charger editing, reports, alerts  (PLANNED, Phase 7: not built)
+  scripts/                       demo tools: simulate.py (charger events, start a session, run jobs), make_admin.py
   tests/
 frontend/
   user-web/                      the driver web app (also hosts the admin pages)
@@ -480,6 +482,8 @@ sequenceDiagram
 
 ### 7.4 Chargers used outside ChargeSpot
 
+> Built in Phase 5: `simulate_charger_event` (migration 011) and `POST /api/admin/chargers/{id}/simulate`. A charger's status changes only through these events, each one is logged in `charger_events`, and an outside start is refused while the charger is reserved.
+
 Stations belong to real operators, and drivers can also start a charger with the operator's own app or card. Real chargers report their status to the operator using a standard protocol called **OCPP**. OCPP can also **reserve** a charger so that only one customer can start it.
 
 We cannot connect to real chargers, so the API includes a **charger simulator** that produces the same kinds of events. The admin page has a **"Simulate external session"** button for demos.
@@ -558,6 +562,12 @@ Jobs run **every minute** using **pg_cron** inside the database. Each job is a S
 
 Every job function takes the current time as an optional parameter (`p_now timestamptz DEFAULT now()`), so tests can simulate any moment without waiting.
 
+**As built (migrations 011 and 012):** `run_due_jobs(p_now, p_station)` runs the five jobs in the order that gives the right answer, and one pg_cron entry (`chargespot-jobs`) calls it every minute. Each job can also be limited to one station. The API runs the same function for the station involved just before availability, booking and session reads (the *lazy checks*, section 6.2), so a hold that ran out, a missed code, a session past its end or an occupied charger is dealt with the moment anyone looks. Sessions are ended by `finish_session`, which works out the energy and the bill with the same formula the live page uses:
+
+> energy = charger power x hours x 0.9 efficiency, never more than the battery has room for (battery size x (100% - start level)); without a vehicle the default 40 kWh battery is used, and a session starts at an assumed 20% charge. Bill = energy x the charger's price per kWh.
+
+What a job does to a booking is shown to the driver: a booking moved to another charger carries the notice *"Moved from CCS2-1 to CCS2-2, same time."*, a driver whose charger is still busy at lock time gets a warning, and a booking cancelled because no charger was free carries *"Cancelled ... fee refunded in full"* (the refund is whatever was actually paid).
+
 **Why pg_cron instead of a scheduler inside the API?** The free Render server sleeps when idle, so an in-app timer would silently stop. pg_cron keeps running inside Supabase. The lazy checks in section 6.2 add a second layer of safety.
 
 ---
@@ -568,6 +578,8 @@ When a booking or charger changes, a database trigger sends a small **"something
 
 - The message carries no booking details, so nothing private leaks through Realtime.
 - The API stays the **single source of truth**. Realtime is only a nudge to refresh.
+
+**As built (migration 013):** triggers on `bookings`, `chargers` and `charging_sessions` call `realtime.send(...)` with `{station_id, charger_id}` on the topic `station:<id>`. Where Realtime does not exist (a plain PostgreSQL) they do nothing, and an error in Realtime never breaks a booking. In the web app, `lib/realtime.ts` shares one Supabase connection and one channel per station; `useRealtimeRefresh` re-fetches from the API when nudged (several nudges at once cause one refresh), polls every 30 seconds when live updates are down, and the app bar shows a "Reconnecting..." banner meanwhile. The map listens to the 20 nearest stations on screen; the station page, the Bookings list, the ticket and the charging page listen to their own stations.
 
 ---
 
@@ -747,3 +759,155 @@ With **3 people**, D's work is shared between B (kiosk API, admin) and C (kiosk 
 - **Refunds:** each cancellation tier boundary.
 - **Recommendation scoring:** weights, ordering, and the "why" text.
 - **Walk-ins:** a walk-in can't overlap a booking; unpaid walk-ins are released; leftover amounts are refunded correctly.
+
+---
+
+## 18. What is built today (code-derived)
+
+Sections 1 to 17 are the design and the reasons, written during planning. This section describes **what the code does today** (as of 2026-10-21, the Phase 5 work included). When it disagrees with an earlier section, the code wins and this section says so. Read it with `docs/FLOW.md` (step-by-step flows), `docs/SCHEMA.md` (tables) and `docs/API.md` (endpoints).
+
+### 18.1 In one paragraph
+
+ChargeSpot is a three-part system in one repository: a **React web app** for drivers, a **FastAPI API** that holds every rule, and a **PostgreSQL database on Supabase** that enforces the most important rules itself (no double booking, legal status changes only) and runs the background jobs (`pg_cron`). The browser also listens to **Supabase Realtime** for "something changed" nudges, and the API talks to a few free outside services. A station **kiosk** app is planned but not built.
+
+### 18.2 Diagram
+
+```mermaid
+flowchart LR
+    subgraph Browser["Driver's browser (frontend/user-web)"]
+        UI["React 19 + Vite app<br/>routes in src/app/App.tsx"]
+        SHARED["@chargespot/shared<br/>constants, formatters, search parser,<br/>cost estimate, generated API types"]
+        RT["lib/realtime.ts<br/>(supabase-js, Realtime only)"]
+        UI --- SHARED
+        UI --- RT
+    end
+
+    subgraph API["API (backend/app, FastAPI)"]
+        ROUTERS["features/*/router.py"]
+        SERVICES["features/*/service.py<br/>(the rules)"]
+        LAZY["features/jobs/lazy.py<br/>(lazy job checks)"]
+        ROUTERS --> SERVICES
+        SERVICES --> LAZY
+    end
+
+    subgraph SB["Supabase"]
+        DB[("PostgreSQL 17<br/>tables, constraints, triggers,<br/>job + event functions")]
+        CRON["pg_cron<br/>run_due_jobs() every minute"]
+        REALTIME["Realtime<br/>topic station:&lt;id&gt;"]
+        CRON --> DB
+        DB -- "notify_station_change()" --> REALTIME
+    end
+
+    GOOGLE["Google Sign-In"]
+    RZP["Razorpay (test mode)"]
+    OSRM["OSRM (routing)"]
+    NOM["Nominatim (geocoding)"]
+    TILES["OpenStreetMap tiles"]
+
+    UI -- "HTTPS + JWT (lib/api.ts)" --> ROUTERS
+    SERVICES -- "SQLAlchemy + psycopg 3<br/>(session pooler)" --> DB
+    REALTIME -- "nudge (wss)" --> RT
+    UI -- "ID token" --> GOOGLE
+    SERVICES -- "verify token / code" --> GOOGLE
+    UI -- "Checkout script + popup" --> RZP
+    SERVICES -- "create order" --> RZP
+    RZP -. "webhook (not registered yet)" .-> ROUTERS
+    SERVICES --> OSRM
+    SERVICES --> NOM
+    UI --> TILES
+
+    KIOSK["Station kiosk app<br/>(frontend/kiosk): NOT BUILT"]
+    KIOSK -. "planned: X-Device-Key" .-> ROUTERS
+```
+
+### 18.3 Components
+
+| Component | Where | What it does | Notes |
+|---|---|---|---|
+| **Web app** | `frontend/user-web/` | The driver's app: map, station page, booking, tickets, live charging, vehicles | React 19, Vite 8, TypeScript, Tailwind CSS v4, React Router 7, Leaflet, lucide icons, `@supabase/supabase-js` (Realtime only) |
+| **Shared package** | `frontend/shared/` (`@chargespot/shared`) | Constants mirroring the database lists, `formatINR` / IST formatters, `parseSearch`, `estimateEnergy`, design tokens (`frontend/shared/src/styles/tokens.css`), generated `api-types.ts` | Consumed as TypeScript source: no build step |
+| **API** | `backend/app/` | Every business rule; authentication; talks to the outside services | Python 3.12, FastAPI, SQLAlchemy 2, psycopg 3, Pydantic, PyJWT, bcrypt, httpx, razorpay SDK |
+| **Database** | `database/migrations/` (schema), Supabase | Stores everything; enforces overlaps and status rules; runs the jobs | PostgreSQL 17 with `btree_gist`, `pg_trgm`, `pg_cron` |
+| **Database tooling** | `database/` | Migration runner, station imports, synthetic and demo data, saved SQL | `python -m database.pipeline`, `python -m database.migrate` |
+| **Demo tools** | `backend/scripts/` | `simulate.py` (charger events, start a session, run jobs), `make_admin.py` | Run with `python -m scripts.<name>` from `backend/` |
+| **Kiosk app** | `frontend/kiosk/` | Station status board, OTP start, walk-in QR payment | **Does not exist yet** (Phase 6) |
+
+#### Outside services
+
+| Service | Used for | Called from | Limits and fallback |
+|---|---|---|---|
+| **Google Sign-In** | Login | `features/auth/google.py`; the button in `features/auth/GoogleSignInButton.tsx` | Needs `GOOGLE_CLIENT_ID`; email login works without it |
+| **Razorpay (test mode)** | The ₹199 booking fee | `features/payments/gateway.py`; Checkout in `lib/razorpay.ts` | Test keys only; no real money; refunds are recorded, not sent |
+| **OSRM** public server | Drive times for recommendations | `features/recommendations/osrm.py` | 3 s timeout, 60 s cache; falls back to straight-line at 25 km/h |
+| **Nominatim** | Place search ("Bopal") | `features/geocoding/service.py` | 1 request per second, only on Enter, 30-day cache in `geocode_cache` |
+| **OpenStreetMap tiles** | Map background | `features/stations/StationMap.tsx` | Fair use; attribution in `components/layout/Footer.tsx` |
+| **Supabase Realtime** | Live nudges | database triggers (migration 013); `lib/realtime.ts` | If it drops: 30 s polling and a "Reconnecting..." banner |
+| **Open Charge Map, Overpass (OSM)** | One-off station imports | `database/imports/` | Run by script, not by users |
+
+### 18.4 Backend structure
+
+`app/main.py` only builds the app. Each feature is a folder in `app/features/` with the same shape: `router.py` (HTTP), `service.py` (rules), `repository.py` (queries, where used), `schemas.py` (Pydantic), `models.py` (SQLAlchemy). Shared code is in `app/core/`.
+
+| Feature | Responsibility | Notable files |
+|---|---|---|
+| `auth` | Register, login, Google, current user, admin check | `router.py`, `tokens.py` (JWT), `passwords.py` (bcrypt), `google.py`, `dependencies.py` (`get_current_user`, `require_admin`) |
+| `stations` | Station search, detail, admin create | `repository.py` (`find_stations`), `service.py` (`build_summary`), `opening_hours.py` |
+| `availability` | The 30-minute grid; "is it free?" in one place | `occupancy.py`, `service.py` |
+| `recommendations` | "Best station" ranking | `scoring.py` (pure), `osrm.py`, `service.py` |
+| `geocoding` | Place search with cache | `service.py` |
+| `search` | Suggestions (stations, operators, cities) | `repository.py` (`pg_trgm`) |
+| `vehicles` | A user's vehicles | `service.py` |
+| `bookings` | Holds, instant bookings, codes, cancel, refunds | `state_machine.py`, `otp.py`, `refunds.py` (pure), `alternatives.py`, `instant.py`, `service.py` |
+| `payments` | Razorpay order, verify, webhook | `gateway.py`, `service.py` (`confirm_payment`) |
+| `charging` | Sessions: live numbers, stop, start | `energy.py` (pure), `service.py` |
+| `chargers` | Admin charger simulator | `service.py` |
+| `jobs` | Lazy job checks | `lazy.py` |
+| `core/` | Errors, logging, slots, geo, connector labels | `errors.py` (`AppError`), `slots.py` (IST, 30-minute blocks) |
+
+Layering rule seen throughout: routers contain no rules; services own the rules and raise `AppError`; pure modules (`scoring.py`, `refunds.py`, `energy.py`, `slots.py`, `alternatives.free_starts_near`, `instant.instant_window`) have no database or network access so they can be unit-tested directly.
+
+### 18.5 Web app structure
+
+```
+src/app/App.tsx            routes (public layout, signed-in layout, /dev/ui in development only)
+src/components/layout/     PublicLayout, AppLayout (top bar, bottom tabs, charging pill, reconnecting banner)
+src/components/ui/         the component library (Button, Card, Field, Sheet, SnapSheet, Tabs, Toast, Badge, Money, ...)
+src/features/<name>/       pages, components and hooks together: auth, home, stations, bookings, charging, profile, dev
+src/lib/                   api.ts (apiFetch), useApiQuery, realtime + useRealtimeRefresh, razorpay, calendar, timers
+```
+
+Routes (all signed-in routes sit inside `ProtectedRoute` + `AppLayout`): `/` (landing), `/login`, `/register`, `/explore`, `/stations/:stationId`, `/book/:bookingId`, `/tickets/:bookingId`, `/receipts/:bookingId`, `/bookings`, `/charging`, `/charging/:sessionId`, `/profile`, `/profile/vehicles`, `/dev/ui` (development builds only); `/dashboard` redirects to `/explore`.
+
+Patterns: data comes from `useApiQuery(key, fetcher)` (keeps old data while loading, aborts stale requests); filters live in the URL; colours, radii, shadows and fonts come only from `frontend/shared/src/styles/tokens.css`; the web app never decides availability, prices or refunds (it displays what the API says).
+
+### 18.6 Cross-cutting rules
+
+| Rule | Where it lives |
+|---|---|
+| Config from environment variables only, no secrets in code | `backend/app/config.py` (`get_settings`, `require_setting`); business numbers in `BOOKING_RULES`, `CHARGING_RULES`, `RECOMMENDATION_RULES`, `SEARCH_RULES`, `EXTERNAL_SERVICES` |
+| One error format | `backend/app/core/errors.py` (`AppError`) |
+| Times in UTC, shown in Asia/Kolkata (fixed +05:30, no tz database) | `backend/app/core/slots.py`; `frontend/shared/src/format.ts` |
+| Money shown in rupees with Indian grouping | `formatINR` in `frontend/shared/src/format.ts`; `components/ui/Money.tsx` |
+| No double booking | Database exclusion constraint `bookings_no_double_booking` (migration 004); the API turns SQLSTATE `23P01` into `409 SLOT_TAKEN` |
+| Legal booking status changes only | `allowed_booking_transitions` + trigger (004) and the identical `state_machine.py` |
+| A charger's status changes only through events | `apply_charger_event` (011), every event logged in `charger_events` |
+| Rules that run by themselves | SQL job functions (011), `pg_cron` (012), lazy checks (`features/jobs/lazy.py`) |
+| Same energy formula everywhere | `session_energy_kwh` (SQL) = `features/charging/energy.py` (tested equal); numbers in the `job_rules` table equal `config.py` (tested) |
+| Realtime carries no data | Migration 013 sends only `{station_id, charger_id}`; the web app always re-fetches |
+| Row-level security on every table | Migration 009 and each later table (a test fails if one is missed) |
+| Generated values are labelled | `data_source`, `estimated_fields`; the UI shows an "Approximate" tag |
+
+### 18.7 Environments
+
+| Environment | Database | Notes |
+|---|---|---|
+| Local development | The **Supabase** project named in `backend/.env` (`DATABASE_URL`) | Decided: Supabase is free, so development uses it directly and there is no separate dev database. Local testing writes real rows to it. |
+| Automated tests | `TEST_DATABASE_URL`, a throwaway local PostgreSQL | Wiped and rebuilt from the migrations on every run |
+| Production | none | ChargeSpot is in the development phase only; nothing is deployed. The plan (Phase 7) names Render for the API and Vercel for both front ends |
+
+### 18.8 Differences between the plan and the code
+
+- The plan's kiosk (`frontend/kiosk/`, `app/features/kiosk/`) and admin area (`/admin`) are not built. The tables for kiosks (`station_devices`, `otp_attempts`) exist but nothing uses them.
+- Payment of the **energy bill** is not built; sessions are billed (`bill_status = 'DUE'`) and the web app shows the amount with a disabled Pay button.
+- The Razorpay **webhook** is implemented but not registered with Razorpay.
+- One `pg_cron` entry runs all five jobs in order, instead of five separate schedules.

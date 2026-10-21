@@ -6,6 +6,7 @@ All the "is it free?" decisions happen here, on the server. The web app only dra
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import BOOKING_RULES
@@ -15,6 +16,8 @@ from app.features.availability.occupancy import UNUSABLE_STATUSES, bookings_over
 from app.features.availability.schemas import (
     AvailabilityBlock, BlockState, ChargerAvailability, StationAvailability,
 )
+from app.features.charging.models import ChargingSession
+from app.features.jobs.lazy import run_due_jobs
 from app.features.stations import repository
 
 # One day back is allowed (to show what just happened), nothing older.
@@ -31,11 +34,16 @@ def check_date_in_range(day: date, now: datetime) -> None:
         )
 
 
-def _state(block_start: datetime, block_end: datetime, usable: bool, now: datetime, bookings: list[tuple[str, datetime, datetime]]) -> BlockState:
+def _state(
+    block_start: datetime, block_end: datetime, usable: bool, now: datetime, bookings: list[tuple[str, datetime, datetime]],
+    busy_outside: bool = False,
+) -> BlockState:
     if block_end <= now:
         return "PAST"
     if not usable:
         return "OUT_OF_SERVICE"
+    if busy_outside and block_start <= now < block_end:
+        return "BUSY_EXTERNAL"  # someone is charging with the operator's own app or card right now
     overlapping = [status for status, b_start, b_end in bookings if b_start < block_end and b_end > block_start]
     if not overlapping:
         return "FREE"
@@ -49,6 +57,11 @@ def station_availability(db: Session, station_id: UUID, day: date, now: datetime
     if not station or not station.is_active:
         raise AppError(404, "STATION_NOT_FOUND", "Station not found.")
 
+    # Lazy checks: holds that ran out, missed codes, sessions past their end, occupied chargers are dealt
+    # with now, so the grid is right even if the minute-by-minute job has not run yet.
+    run_due_jobs(db, now, station_id)
+    station = repository.get_station(db, station_id)
+
     blocks = day_blocks(day)
     day_start, day_end = blocks[0][0], blocks[-1][1]
 
@@ -56,6 +69,14 @@ def station_availability(db: Session, station_id: UUID, day: date, now: datetime
     by_charger: dict[UUID, list[tuple[str, datetime, datetime]]] = {}
     for charger_id, status, start, end in bookings_overlapping(db, [c.charger_id for c in station.chargers], day_start, day_end, now):
         by_charger.setdefault(charger_id, []).append((status, start, end))
+
+    # Chargers an outside session is using right now (ONE query): their current block is BUSY_EXTERNAL.
+    busy_outside = set(db.scalars(
+        select(ChargingSession.charger_id).where(
+            ChargingSession.charger_id.in_([c.charger_id for c in station.chargers]),
+            ChargingSession.ended_at.is_(None), ChargingSession.source == "EXTERNAL",
+        )
+    ))
 
     chargers = [
         ChargerAvailability(
@@ -69,7 +90,7 @@ def station_availability(db: Session, station_id: UUID, day: date, now: datetime
             blocks=[
                 AvailabilityBlock(
                     start=start, end=end,
-                    state=_state(start, end, c.status not in UNUSABLE_STATUSES, now, by_charger.get(c.charger_id, [])),
+                    state=_state(start, end, c.status not in UNUSABLE_STATUSES, now, by_charger.get(c.charger_id, []), c.charger_id in busy_outside),
                 )
                 for start, end in blocks
             ],

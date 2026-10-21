@@ -62,6 +62,12 @@ class BookingOut(BaseModel):
     code_used: bool
     can_cancel: bool
     can_show_new_code: bool
+    # Set when the charger's situation changed this booking: it was moved to another charger, the driver
+    # was warned the charger may be busy, or it was cancelled because no charger was free (fee refunded).
+    notice_kind: str | None = None  # WARNING | MOVED | CANCELLED_NO_CHARGER
+    notice_text: str | None = None
+    # The live charging page of this booking, once charging has started.
+    session_id: UUID | None = None
 
 
 class InstantBookingOut(BookingOut):

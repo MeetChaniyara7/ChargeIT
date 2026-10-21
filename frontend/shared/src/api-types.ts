@@ -527,6 +527,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/sessions/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active Session
+         * @description The session that is charging right now, or null. Powers the Charging tab and the app-bar pill.
+         */
+        get: operations["active_session_api_me_sessions_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session
+         * @description Live values: energy, battery level, cost so far, time left. Only the owner can see a session.
+         */
+        get: operations["get_session_api_me_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/{session_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Session
+         * @description Stop charging now. The bill is worked out up to this moment.
+         */
+        post: operations["stop_session_api_me_sessions__session_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/chargers/{charger_id}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Simulate Charger Event
+         * @description Make a charger behave like a real one: an outside start (refused while it is reserved), a stop,
+         *     an unplug, a fault or a recovery. A refusal is a normal answer (accepted = false), not an error.
+         */
+        post: operations["simulate_charger_event_api_admin_chargers__charger_id__simulate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/bookings/{booking_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Booking Session
+         * @description Demo stand-in for the kiosk: start charging for a confirmed booking as if its code was typed.
+         */
+        post: operations["start_booking_session_api_admin_bookings__booking_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -599,7 +700,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "FREE" | "BOOKED" | "HELD" | "PAST" | "OUT_OF_SERVICE";
+            state: "FREE" | "BOOKED" | "HELD" | "PAST" | "OUT_OF_SERVICE" | "BUSY_EXTERNAL";
         };
         /** BookingCharger */
         BookingCharger: {
@@ -700,6 +801,12 @@ export interface components {
             can_cancel: boolean;
             /** Can Show New Code */
             can_show_new_code: boolean;
+            /** Notice Kind */
+            notice_kind?: string | null;
+            /** Notice Text */
+            notice_text?: string | null;
+            /** Session Id */
+            session_id?: string | null;
         };
         /** BookingStation */
         BookingStation: {
@@ -904,6 +1011,12 @@ export interface components {
             can_cancel: boolean;
             /** Can Show New Code */
             can_show_new_code: boolean;
+            /** Notice Kind */
+            notice_kind?: string | null;
+            /** Notice Text */
+            notice_text?: string | null;
+            /** Session Id */
+            session_id?: string | null;
             /** Otp */
             otp: string;
         };
@@ -916,6 +1029,70 @@ export interface components {
             charger_id: string;
             /** Vehicle Id */
             vehicle_id?: string | null;
+        };
+        /** LiveSession */
+        LiveSession: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Booking Id */
+            booking_id?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "RUNNING" | "ENDED";
+            /** Source */
+            source: string;
+            station: components["schemas"]["BookingStation"];
+            charger: components["schemas"]["BookingCharger"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Planned Stop At */
+            planned_stop_at?: string | null;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Seconds Left */
+            seconds_left?: number | null;
+            /** Energy Kwh */
+            energy_kwh: number;
+            /** Battery Percent */
+            battery_percent: number;
+            /** Cost So Far */
+            cost_so_far: number;
+            /** Ended At */
+            ended_at?: string | null;
+            /** End Reason */
+            end_reason?: string | null;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Bill Amount */
+            bill_amount?: number | null;
+            /** Bill Status */
+            bill_status?: string | null;
+            /**
+             * Stop Warning
+             * @default false
+             */
+            stop_warning: boolean;
+            /**
+             * Next Booking Waiting
+             * @default false
+             */
+            next_booking_waiting: boolean;
+            /**
+             * Can Stop
+             * @default false
+             */
+            can_stop: boolean;
         };
         /**
          * OrderOut
@@ -1043,6 +1220,25 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** SimulateRequest */
+        SimulateRequest: {
+            /**
+             * Event
+             * @enum {string}
+             */
+            event: "EXTERNAL_START" | "EXTERNAL_STOP" | "FAULT" | "RECOVER" | "UNPLUG";
+        };
+        /** SimulateResult */
+        SimulateResult: {
+            /** Accepted */
+            accepted: boolean;
+            /** Status */
+            status: string;
+            /** Reason */
+            reason?: string | null;
+            /** Session Id */
+            session_id?: string | null;
+        };
         /** SlotAlternative */
         SlotAlternative: {
             /**
@@ -1077,6 +1273,24 @@ export interface components {
          */
         SlotTakenResponse: {
             error: components["schemas"]["SlotTakenError"];
+        };
+        /** StartedSession */
+        StartedSession: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
         };
         /** StationAlternative */
         StationAlternative: {
@@ -2459,6 +2673,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    active_session_api_me_sessions_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSession"] | null;
+                };
+            };
+        };
+    };
+    get_session_api_me_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_session_api_me_sessions__session_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_charger_event_api_admin_chargers__charger_id__simulate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_booking_session_api_admin_bookings__booking_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedSession"];
                 };
             };
             /** @description Validation Error */

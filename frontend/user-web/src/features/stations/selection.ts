@@ -21,6 +21,7 @@ const WHY_NOT: Record<Exclude<BlockState, 'FREE'>, string> = {
   PAST: 'That time has already passed.',
   BOOKED: 'That block is already booked.',
   HELD: 'Someone is paying for that block right now. Try another one.',
+  BUSY_EXTERNAL: "Another driver is charging here right now with the operator's own app.",
   OUT_OF_SERVICE: 'This charger is out of service at that time.',
 };
 

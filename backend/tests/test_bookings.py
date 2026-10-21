@@ -292,8 +292,18 @@ def test_charge_now_stops_five_minutes_before_the_next_booking(db, world):
     assert booking.end == NOW + timedelta(minutes=55)
 
 
+def test_charge_now_takes_over_a_slot_whose_driver_never_showed_up(db, world):
+    """Confirmed, started an hour ago, nobody entered the code: the lazy check makes it a no-show, freeing the charger."""
+    unclaimed = make_booking(db, world["a"], NOW - HOUR, NOW + HOUR, user_id=world["other"])
+    booking = service.create_instant(db, world["user"], world["a"], None, NOW)
+    assert booking.status == "CONFIRMED"
+    assert booking_status(db, unclaimed) == "NO_SHOW"
+
+
 def test_charge_now_refuses_when_the_charger_is_busy_or_the_next_booking_is_too_close(db, world):
-    make_booking(db, world["a"], NOW - HOUR, NOW + HOUR, user_id=world["other"])
+    busy = make_booking(db, world["a"], NOW - HOUR, NOW + HOUR, user_id=world["other"])
+    db.execute(text("UPDATE bookings SET status = 'ACTIVE', otp_used_at = :t WHERE booking_id = :b"), {"t": NOW - HOUR, "b": busy})
+    db.commit()  # someone is charging on it right now
     with pytest.raises(AppError) as error:
         service.create_instant(db, world["user"], world["a"], None, NOW)
     assert error.value.code == "CHARGER_BUSY"

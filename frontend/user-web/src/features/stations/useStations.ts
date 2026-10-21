@@ -26,6 +26,7 @@ export function useStations(bounds: MapBounds | null, reference: LatLng | null, 
     refreshing: query.refreshing,
     error: query.error,
     retry: query.retry,
+    refresh: query.refresh,
     /** The map area the current results are for (used by the "no results" helper). */
     settledBounds,
   };

@@ -62,6 +62,38 @@ The last four are optional at startup: the rest of the API runs without them, an
 
 Ask a teammate for the shared Google client ID. **Never commit `.env` files.**
 
+### Background jobs and live updates (Phase 5)
+
+`python -m database.migrate` applies migrations 011 to 013. `012` turns on the free **pg_cron** extension and schedules one job that runs every minute; check it any time in DBeaver:
+
+```sql
+select jobname, schedule, active from cron.job;
+select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;
+```
+
+(`database/queries/jobs_status.sql` has these and more.) On a database without pg_cron, such as the local test database, the jobs are not scheduled, but they still run lazily when the API is asked.
+
+**Live updates need the web app's Supabase values to belong to the SAME project as the database.** In `frontend/user-web/.env`:
+
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<the project's anon / publishable key>
+```
+
+The project ref is the part of your Session pooler user name after `postgres.`. Find the URL and key in Supabase: Project Settings -> API. If they point to another project, the app still works: it shows "Reconnecting..." and refreshes every 30 seconds.
+
+**Demo tools** (from `backend`, venv active):
+
+```bash
+python -m scripts.simulate list "riya"                    # find chargers
+python -m scripts.simulate bookings you@example.com       # a driver's upcoming bookings and their ids
+python -m scripts.simulate event EXTERNAL_START "Riya" CCS2-1   # an outside driver starts it (refused while reserved)
+python -m scripts.simulate event UNPLUG "Riya" CCS2-1           # also EXTERNAL_STOP, FAULT, RECOVER
+python -m scripts.simulate start <booking-id>             # start charging like the kiosk will
+python -m scripts.simulate jobs                           # run the background jobs once, now
+python -m scripts.make_admin you@example.com              # make an account an admin (for the /api/admin endpoints)
+```
+
 ### Razorpay test mode (booking payments)
 
 1. Sign up free at razorpay.com and switch the dashboard to **Test mode** (no business details or bank account are needed for test keys).

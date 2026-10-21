@@ -3,9 +3,13 @@ import { BatteryCharging, Map, Ticket, User } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { initialsOf } from '../../features/auth/initials';
+import { useActiveSession } from '../../features/charging/activeSessionContext';
+import { ActiveSessionProvider } from '../../features/charging/ActiveSessionProvider';
+import { useRealtimeDown } from '../../lib/useRealtimeRefresh';
 import { cx } from '../ui';
 import { Footer } from './Footer';
 import { Logo } from './Logo';
+import { ReconnectingBanner } from './ReconnectingBanner';
 
 interface NavItem {
   to: string;
@@ -22,13 +26,46 @@ const NAV: NavItem[] = [
   { to: '/profile', label: 'Profile', icon: User },
 ];
 
+/** A small green dot that breathes: something is happening here. */
+const LiveDot = ({ className }: { className?: string }) => (
+  <span aria-hidden="true" className={cx('absolute size-2.5 rounded-full bg-primary motion-safe:animate-pulse', className)} />
+);
+
+/** "Charging · 68%" in the app bar while a session runs; opens that session. */
+export function ChargingPill() {
+  const { active } = useActiveSession();
+  if (!active) return null;
+  return (
+    <NavLink
+      to={`/charging/${active.session_id}`}
+      aria-label={`Charging, ${Math.round(active.battery_percent)} percent. Open the live charging page.`}
+      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-3 text-sm font-bold text-primary"
+    >
+      <span className="relative flex size-2.5">
+        <LiveDot className="inset-0" />
+      </span>
+      <span className="num">Charging · {Math.round(active.battery_percent)}%</span>
+    </NavLink>
+  );
+}
+
 /**
  * The frame for signed-in pages.
  * Desktop: slim top bar. Phone: slim logo bar on top and a tab bar at the bottom
  * (with room for the phone's home indicator).
  */
 export function AppLayout() {
+  return (
+    <ActiveSessionProvider>
+      <Frame />
+    </ActiveSessionProvider>
+  );
+}
+
+function Frame() {
   const { user } = useAuth();
+  const { active } = useActiveSession();
+  const reconnecting = useRealtimeDown();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -52,20 +89,27 @@ export function AppLayout() {
                   )
                 }
               >
-                <Icon className="size-4" aria-hidden="true" />
+                <span className="relative">
+                  <Icon className="size-4" aria-hidden="true" />
+                  {to === '/charging' && active && <LiveDot className="-right-1 -top-1 size-2" />}
+                </span>
                 {label}
               </NavLink>
             ))}
           </nav>
 
-          <NavLink
-            to="/profile"
-            aria-label="Your profile"
-            className="ml-auto flex size-11 items-center justify-center rounded-full bg-raised text-sm font-bold md:hidden"
-          >
-            {initialsOf(user?.full_name, user?.email)}
-          </NavLink>
+          <div className="ml-auto flex items-center gap-3">
+            <ChargingPill />
+            <NavLink
+              to="/profile"
+              aria-label="Your profile"
+              className="flex size-11 items-center justify-center rounded-full bg-raised text-sm font-bold md:hidden"
+            >
+              {initialsOf(user?.full_name, user?.email)}
+            </NavLink>
+          </div>
         </div>
+        <ReconnectingBanner visible={reconnecting} />
       </header>
 
       {/* Bottom padding keeps content clear of the phone tab bar. */}
@@ -92,7 +136,10 @@ export function AppLayout() {
                   )
                 }
               >
-                <Icon className="size-6" aria-hidden="true" />
+                <span className="relative">
+                  <Icon className="size-6" aria-hidden="true" />
+                  {to === '/charging' && active && <LiveDot className="-right-1 -top-0.5" />}
+                </span>
                 {label}
               </NavLink>
             </li>

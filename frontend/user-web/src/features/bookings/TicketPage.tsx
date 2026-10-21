@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, CalendarPlus, Check, KeyRound, MapPin, Navigation, RefreshCw } from 'lucide-react';
+import { AlertCircle, BatteryCharging, CalendarPlus, Check, KeyRound, MapPin, Navigation, RefreshCw } from 'lucide-react';
 import { formatTimeIST } from '@chargespot/shared';
 import { Button, buttonClasses, Card, SkeletonBlock, StatusBadge } from '../../components/ui';
 import { downloadIcs } from '../../lib/calendar';
+import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { directionsUrl } from '../stations/directions';
 import { saveSelection } from '../stations/selectionStorage';
 import { CodeTiles } from './CodeTiles';
 import { formatSlot } from './format';
+import { NearbyAlternatives } from './NearbyAlternatives';
+import { NoticeBanner } from './NoticeBanner';
 import type { BookingOut, TicketState } from './types';
 import { useBooking } from './useBookings';
+import { useNoticeToasts } from './useNoticeToasts';
 
 /** A hole punched out of the card's edge, where the dashed tear line meets it. */
 const Notch: React.FC<{ side: 'left' | 'right' }> = ({ side }) => (
@@ -50,6 +54,9 @@ export const TicketPage: React.FC = () => {
 
   const booking = query.data?.booking;
   const stationId = booking?.station.station_id;
+  // Live updates: if the booking is moved or cancelled while this page is open, it changes here and a toast says so.
+  useRealtimeRefresh(stationId ? [stationId] : [], query.refresh);
+  useNoticeToasts(booking ? [booking] : undefined);
   useEffect(() => {
     // The booking is made, so the remembered pick on the station page is no longer needed.
     if (stationId) saveSelection(stationId, null);
@@ -91,6 +98,7 @@ export const TicketPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-md space-y-4 px-4 py-6">
+      <NoticeBanner kind={booking.notice_kind} text={booking.notice_text} />
       <Card elevation={2} className="relative overflow-visible">
         {/* top half: what and when */}
         <div className="space-y-3 p-5 text-center">
@@ -160,12 +168,19 @@ export const TicketPage: React.FC = () => {
           <Navigation className="size-4" aria-hidden="true" />
           Navigate
         </a>
-        {active && (
+        {booking.status === 'ACTIVE' && booking.session_id && (
+          <Link to={`/charging/${booking.session_id}`} className={buttonClasses({ size: 'lg', variant: 'secondary' })}>
+            <BatteryCharging className="size-4" aria-hidden="true" />
+            Open live charging
+          </Link>
+        )}
+        {booking.status === 'CONFIRMED' && (
           <Button size="lg" variant="secondary" icon={<CalendarPlus className="size-4" aria-hidden="true" />} onClick={() => addToCalendar(booking)}>
             Add to calendar
           </Button>
         )}
       </div>
+      {booking.notice_kind === 'CANCELLED_NO_CHARGER' && <NearbyAlternatives booking={booking} />}
       <Link to="/bookings" className={buttonClasses({ variant: 'ghost', fullWidth: true })}>
         My bookings
       </Link>

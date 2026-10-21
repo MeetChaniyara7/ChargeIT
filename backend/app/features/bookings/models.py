@@ -34,10 +34,14 @@ class Booking(Base):
     refund_amount = Column(Numeric(10, 2), nullable=False, server_default="0")
     cancelled_at = Column(DateTime(timezone=True))
     cancel_reason = Column(Text)
+    # Set by the jobs when the charger's situation changes the booking (migration 011).
+    moved_from_charger_id = Column(UUID(as_uuid=True), ForeignKey("chargers.charger_id"))
+    notice_kind = Column(Text)  # WARNING | MOVED | CANCELLED_NO_CHARGER
+    notice_text = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    charger = relationship("Charger")  # queries load it explicitly (joinedload) when they need it
+    charger = relationship("Charger", foreign_keys=[charger_id])  # queries load it explicitly (joinedload) when they need it
 
     @property
     def start(self):

@@ -143,6 +143,21 @@ BOOKING_RULES = BookingRules()
 
 
 @dataclass(frozen=True)
+class ChargingRules:
+    """How a charging session is simulated. The same numbers are in the job_rules table (migration 011);
+    a test checks the two agree, so the SQL jobs and the API always use one formula."""
+
+    efficiency: float = 0.9  # share of the charger's rated power that reaches the battery
+    default_start_soc_percent: float = 20.0  # battery level assumed when it is not known
+    default_battery_kwh: float = 40.0  # battery size assumed when the booking has no vehicle
+    stop_warning_minutes: int = 5  # the live page warns this long before an automatic stop
+    next_booking_waiting_minutes: int = 30  # "next booking waiting" if one starts within this long after the stop
+
+
+CHARGING_RULES = ChargingRules()
+
+
+@dataclass(frozen=True)
 class RecommendationWeights:
     """How much each factor counts in the "best station" score. They add up to 1.
 
