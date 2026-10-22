@@ -46,3 +46,27 @@ class StartedSession(BaseModel):
     session_id: UUID
     booking_id: UUID
     charger_id: UUID
+
+
+class ReceiptOut(BaseModel):
+    """Everything on the printed receipt. Amounts are the server's, copied from the finished session."""
+
+    session_id: UUID
+    booking_id: UUID | None = None
+    station_name: str
+    station_address: str | None = None
+    station_city: str | None = None
+    charger_label: str
+    connector_type: str
+    power_kw: float | None = None
+    started_at: dt.datetime
+    ended_at: dt.datetime
+    duration_minutes: float
+    energy_kwh: float
+    price_per_kwh: float | None = None
+    total: float
+    bill_status: str  # DUE | PAID | PREPAID_SETTLED
+    paid_at: dt.datetime | None = None
+    payment_reference: str | None = None  # Razorpay's payment id, once paid
+    booking_fee: float | None = None  # the ₹199 fee paid earlier for this booking (informational; not part of the total)
+    source: str

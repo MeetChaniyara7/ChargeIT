@@ -587,6 +587,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/sessions/{session_id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay Bill
+         * @description The Razorpay order for this session's energy bill (the amount is the bill the server worked out).
+         */
+        post: operations["pay_bill_api_me_sessions__session_id__pay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/{session_id}/pay/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Bill
+         * @description Check Razorpay's signature, mark the bill paid and return the updated session.
+         */
+        post: operations["verify_bill_api_me_sessions__session_id__pay_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/sessions/{session_id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Receipt
+         * @description The receipt for a finished session (DUE bills show as unpaid).
+         */
+        get: operations["get_receipt_api_me_sessions__session_id__receipt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/chargers/{charger_id}/simulate": {
         parameters: {
             query?: never;
@@ -622,6 +682,148 @@ export interface paths {
          * @description Demo stand-in for the kiosk: start charging for a confirmed booking as if its code was typed.
          */
         post: operations["start_booking_session_api_admin_bookings__booking_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kiosk Status
+         * @description The status board: every charger's state, progress and free-until time. No names, phone numbers or bills.
+         *     The setup screen also calls this to check a pasted key.
+         */
+        get: operations["kiosk_status_api_kiosk_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/otp-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Otp Start
+         * @description Start the charger of the booking this code belongs to. 5 wrong tries in a row: 2 minutes' wait (429 OTP_COOLDOWN).
+         */
+        post: operations["otp_start_api_kiosk_otp_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/walk-ins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Walk In
+         * @description Take a free charger without a booking: holds it for 3 minutes and returns the payment link to show as a QR.
+         */
+        post: operations["create_walk_in_api_kiosk_walk_ins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/walk-ins/{walk_in_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Walk In
+         * @description Has the walk-in paid yet? Poll this while the QR is on screen.
+         */
+        get: operations["get_walk_in_api_kiosk_walk_ins__walk_in_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kiosk/walk-ins/{walk_in_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Walk In
+         * @description Back out of the QR screen: the charger is free again at once.
+         */
+        post: operations["cancel_walk_in_api_kiosk_walk_ins__walk_in_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/stations/{station_id}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Devices */
+        get: operations["list_devices_api_admin_stations__station_id__devices_get"];
+        put?: never;
+        /**
+         * New Device
+         * @description Create a kiosk key for a station. The key is in this response only; copy it to the tablet now.
+         */
+        post: operations["new_device_api_admin_stations__station_id__devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/devices/{device_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable Device
+         * @description Switch a kiosk off (a lost tablet). Its key stops working at once.
+         */
+        post: operations["disable_device_api_admin_devices__device_id__disable_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -902,6 +1104,111 @@ export interface components {
             /** Estimated Fields */
             estimated_fields?: string[];
         };
+        /** ChargerTile */
+        ChargerTile: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Label */
+            label: string;
+            /** Connector Type */
+            connector_type: string;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "FREE" | "RESERVED" | "CHARGING" | "PAYING" | "OUT_OF_SERVICE";
+            /** Free Until */
+            free_until?: string | null;
+            /** Reserved For */
+            reserved_for?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Progress Percent */
+            progress_percent?: number | null;
+            walk_in?: components["schemas"]["WalkInProgress"] | null;
+            last_walk_in?: components["schemas"]["WalkInDone"] | null;
+            /**
+             * Can Walk In
+             * @default false
+             */
+            can_walk_in: boolean;
+            /** Walk In Blocked Reason */
+            walk_in_blocked_reason?: string | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: components["schemas"]["WalkInOption"][];
+        };
+        /** DeviceCreate */
+        DeviceCreate: {
+            /**
+             * Name
+             * @description A label for the tablet, e.g. 'Entrance kiosk'.
+             */
+            name: string;
+        };
+        /** DeviceCreated */
+        DeviceCreated: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Key */
+            key: string;
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** DueItem */
         DueItem: {
             /**
@@ -926,6 +1233,27 @@ export interface components {
             total: number;
             /** Items */
             items: components["schemas"]["DueItem"][];
+        };
+        /**
+         * EnergyOrderOut
+         * @description Razorpay Checkout details for paying a finished session's energy bill (the amount is the server's bill).
+         */
+        EnergyOrderOut: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Order Id */
+            order_id: string;
+            /** Amount */
+            amount: number;
+            /** Amount Paise */
+            amount_paise: number;
+            /** Currency */
+            currency: string;
+            /** Key Id */
+            key_id: string;
         };
         /** GeocodeResponse */
         GeocodeResponse: {
@@ -1029,6 +1357,20 @@ export interface components {
             charger_id: string;
             /** Vehicle Id */
             vehicle_id?: string | null;
+        };
+        /** KioskStatus */
+        KioskStatus: {
+            /** Station Name */
+            station_name: string;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Idle Reset Seconds */
+            idle_reset_seconds: number;
+            /** Chargers */
+            chargers: components["schemas"]["ChargerTile"][];
         };
         /** LiveSession */
         LiveSession: {
@@ -1155,6 +1497,28 @@ export interface components {
              */
             note: string;
         };
+        /** OtpStartOut */
+        OtpStartOut: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Charger Label */
+            charger_label: string;
+            /** Connector Type */
+            connector_type: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
+        /** OtpStartRequest */
+        OtpStartRequest: {
+            /** Otp */
+            otp: string;
+        };
         /** Place */
         Place: {
             /** Name */
@@ -1172,6 +1536,59 @@ export interface components {
             ] | null;
             /** Kind */
             kind?: string | null;
+        };
+        /**
+         * ReceiptOut
+         * @description Everything on the printed receipt. Amounts are the server's, copied from the finished session.
+         */
+        ReceiptOut: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Booking Id */
+            booking_id?: string | null;
+            /** Station Name */
+            station_name: string;
+            /** Station Address */
+            station_address?: string | null;
+            /** Station City */
+            station_city?: string | null;
+            /** Charger Label */
+            charger_label: string;
+            /** Connector Type */
+            connector_type: string;
+            /** Power Kw */
+            power_kw?: number | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Energy Kwh */
+            energy_kwh: number;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+            /** Total */
+            total: number;
+            /** Bill Status */
+            bill_status: string;
+            /** Paid At */
+            paid_at?: string | null;
+            /** Payment Reference */
+            payment_reference?: string | null;
+            /** Booking Fee */
+            booking_fee?: number | null;
+            /** Source */
+            source: string;
         };
         /** Recommendation */
         Recommendation: {
@@ -1662,6 +2079,109 @@ export interface components {
             razorpay_payment_id: string;
             /** Razorpay Signature */
             razorpay_signature: string;
+        };
+        /** WalkInCreate */
+        WalkInCreate: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /**
+             * Amount
+             * @description One of the offered amounts, in rupees.
+             */
+            amount?: number | null;
+            /**
+             * Until Next
+             * @default false
+             */
+            until_next: boolean;
+        };
+        /**
+         * WalkInDone
+         * @description A walk-in that just finished (shown on the tile for two minutes).
+         */
+        WalkInDone: {
+            /** Used */
+            used: number;
+            /** Refunded */
+            refunded: number;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+        };
+        /**
+         * WalkInOption
+         * @description One choice on the "how much?" screen. The kWh figure is worked out on the server.
+         */
+        WalkInOption: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "AMOUNT" | "UNTIL_NEXT";
+            /** Amount */
+            amount: number;
+            /** Kwh */
+            kwh: number;
+            /** Until */
+            until?: string | null;
+        };
+        /** WalkInOut */
+        WalkInOut: {
+            /**
+             * Walk In Id
+             * Format: uuid
+             */
+            walk_in_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "WAITING_FOR_PAYMENT" | "PAID" | "EXPIRED" | "CANCELLED";
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Charger Label */
+            charger_label: string;
+            /** Amount */
+            amount: number;
+            /** Payment Url */
+            payment_url?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Seconds Left */
+            seconds_left: number;
+            /** Session Id */
+            session_id?: string | null;
+            /**
+             * Refunded
+             * @default 0
+             */
+            refunded: number;
+        };
+        /**
+         * WalkInProgress
+         * @description A walk-in session in progress: how much of the prepaid amount is used.
+         */
+        WalkInProgress: {
+            /** Prepaid */
+            prepaid: number;
+            /** Used */
+            used: number;
         };
         /** WebhookAck */
         WebhookAck: {
@@ -2768,6 +3288,103 @@ export interface operations {
             };
         };
     };
+    pay_bill_api_me_sessions__session_id__pay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnergyOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_bill_api_me_sessions__session_id__pay_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_receipt_api_me_sessions__session_id__receipt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     simulate_charger_event_api_admin_chargers__charger_id__simulate_post: {
         parameters: {
             query?: never;
@@ -2821,6 +3438,270 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StartedSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kiosk_status_api_kiosk_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-device-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KioskStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    otp_start_api_kiosk_otp_start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-device-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OtpStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OtpStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_walk_in_api_kiosk_walk_ins_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-device-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalkInCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalkInOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_walk_in_api_kiosk_walk_ins__walk_in_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-device-key"?: string;
+            };
+            path: {
+                walk_in_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalkInOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_walk_in_api_kiosk_walk_ins__walk_in_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-device-key"?: string;
+            };
+            path: {
+                walk_in_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalkInOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_api_admin_stations__station_id__devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_device_api_admin_stations__station_id__devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_device_api_admin_devices__device_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
                 };
             };
             /** @description Validation Error */

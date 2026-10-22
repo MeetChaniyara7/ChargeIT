@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, MapPin, RefreshCw, TimerOff } from 'lucide-r
 import { formatINR, formatTimeIST } from '@chargespot/shared';
 import { Button, buttonClasses, Card, Money, SkeletonBlock, SkeletonLine, useToast } from '../../components/ui';
 import { ApiError, apiFetch } from '../../lib/api';
-import { openCheckout } from '../../lib/razorpay';
+import { openCheckout, primaryColour } from '../../lib/razorpay';
 import type { PaymentResult } from '../../lib/razorpay';
 import { useAuth } from '../auth/AuthContext';
 import { formatSlot } from './format';
@@ -12,12 +12,6 @@ import type { OrderOut, TicketState, VerifyOut, VerifyRequest } from './types';
 import { useBooking } from './useBookings';
 import { HoldRing } from './HoldRing';
 import { useHoldCountdown } from './useHoldCountdown';
-
-/** The primary colour for Razorpay's window. Read from the design tokens so the two stay in step. */
-function primaryColour(): string {
-  const value = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim();
-  return /^#[0-9a-f]{6}$/i.test(value) ? value : '#22c55e';
-}
 
 type Problem =
   | { kind: 'payment'; message: string }

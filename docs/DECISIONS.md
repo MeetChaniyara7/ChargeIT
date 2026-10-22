@@ -54,6 +54,14 @@ Choices visible in the codebase, with the reasoning. **"Documented"** means the 
 | 36 | **Supabase session pooler connection string** for the API | Documented (§16): direct connections are IPv6-only and Render cannot reach them. |
 | 37 | **Filters held in the page URL**, picks in `sessionStorage`, recent searches in `localStorage` | Inferred: shareable views and Back working; browser-only data stays out of the API. |
 | 38 | **Everything on free tiers** (Supabase, Render, Vercel, Razorpay test, OSM services) | Documented (§2): a stated project constraint. |
+| 39 | **The kiosk polls the API** (board every 4 s, a walk-in every 2 s) instead of using Supabase Realtime | Inferred from the code and decided in Phase 6: the tablet is shared and unattended, so it should not hold a Supabase key; polling is simple and survives a dropped connection. |
+| 40 | **Wrong-code rule counted from `otp_attempts`**: every 5th wrong try in a row starts a 2-minute wait; a right code resets the count | Documented (`architecture.md` §9: 5 tries, 2 minutes, never a hard lock-out). Counting from the attempts table needs no extra column. |
+| 41 | **A right code outside its window counts as a wrong try**; a right code on a charger that cannot start does not | Phase 6 choice: a guess is a guess, but a broken charger is not the driver's fault. |
+| 42 | **A walk-in uses the "Charge now" window** (earlier of 2 hours and next booking minus 5 minutes, at least 15 minutes) | Documented (`architecture.md` §15: walk-in buffer 5 minutes before the next booking; instant maximum 2 hours). |
+| 43 | **A walk-in is confirmed only when Razorpay says so**: the `payment_link.paid` webhook, or the kiosk asking Razorpay about the link while no webhook is registered | Documented rule (a payment counts only after the API verified it with Razorpay); the polling path is a Phase 6 addition because the webhook needs a public URL. |
+| 44 | **Payment links get no short expiry**; the 3-minute hold is ours, and a late payment is refunded in full (recorded) | Razorpay requires a link to live at least 15 minutes. |
+| 45 | **Walk-in settlement lives in `finish_session`** and caps the bill at the prepaid amount | Every way a session ends (unplug, job, admin) must settle the same way; the job runs once a minute, so the meter can run a little past the money. |
+| 46 | **The energy receipt is `/receipts/session/:sessionId`**; `/receipts/:bookingId` stays the booking-fee receipt | The plan wrote `/receipts/:sessionId`, which clashes with the existing route. |
 
 ## Decided by the owner (2026-10-21)
 

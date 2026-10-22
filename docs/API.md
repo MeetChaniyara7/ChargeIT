@@ -49,9 +49,20 @@ Generated from the running app's own OpenAPI spec (`app.openapi()`, the same dat
 | POST | `/api/payments/webhook` | Public | Called by Razorpay, not by the browser. The signature covers the raw body, so read it untouched. |
 | GET | `/api/me/sessions/active` | Login required | The session that is charging right now, or null. Powers the Charging tab and the app-bar pill. |
 | GET | `/api/me/sessions/{session_id}` | Login required | Live values: energy, battery level, cost so far, time left. Only the owner can see a session. |
+| POST | `/api/me/sessions/{session_id}/pay` | Login required | The Razorpay order for this session's energy bill (the amount is the bill the server worked out). |
+| POST | `/api/me/sessions/{session_id}/pay/verify` | Login required | Check Razorpay's signature, mark the bill paid and return the updated session. |
+| GET | `/api/me/sessions/{session_id}/receipt` | Login required | The receipt for a finished session (DUE bills show as unpaid). |
 | POST | `/api/me/sessions/{session_id}/stop` | Login required | Stop charging now. The bill is worked out up to this moment. |
 | POST | `/api/admin/bookings/{booking_id}/start` | Admin only | Demo stand-in for the kiosk: start charging for a confirmed booking as if its code was typed. |
 | POST | `/api/admin/chargers/{charger_id}/simulate` | Admin only | Make a charger behave like a real one: an outside start (refused while it is reserved), a stop, |
+| POST | `/api/kiosk/otp-start` | Kiosk device key | Start the charger of the booking this code belongs to. 5 wrong tries in a row: 2 minutes' wait (429 OTP_COOLDOWN). |
+| GET | `/api/kiosk/status` | Kiosk device key | The status board: every charger's state, progress and free-until time. No names, phone numbers or bills. |
+| POST | `/api/kiosk/walk-ins` | Kiosk device key | Take a free charger without a booking: holds it for 3 minutes and returns the payment link to show as a QR. |
+| GET | `/api/kiosk/walk-ins/{walk_in_id}` | Kiosk device key | Has the walk-in paid yet? Poll this while the QR is on screen. |
+| POST | `/api/kiosk/walk-ins/{walk_in_id}/cancel` | Kiosk device key | Back out of the QR screen: the charger is free again at once. |
+| POST | `/api/admin/devices/{device_id}/disable` | Admin only | Switch a kiosk off (a lost tablet). Its key stops working at once. |
+| GET | `/api/admin/stations/{station_id}/devices` | Admin only | List Devices |
+| POST | `/api/admin/stations/{station_id}/devices` | Admin only | Create a kiosk key for a station. The key is in this response only; copy it to the tablet now. |
 
 ## Endpoints by area
 
@@ -642,6 +653,62 @@ Live values: energy, battery level, cost so far, time left. Only the owner can s
 
 - **200** Successful Response: `LiveSession`
 
+#### `POST /api/me/sessions/{session_id}/pay`
+
+The Razorpay order for this session's energy bill (the amount is the bill the server worked out).
+
+**Auth:** Login required (Bearer token)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `session_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `EnergyOrderOut`
+
+#### `POST /api/me/sessions/{session_id}/pay/verify`
+
+Check Razorpay's signature, mark the bill paid and return the updated session.
+
+**Auth:** Login required (Bearer token)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `session_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `VerifyRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `razorpay_order_id` | string (min length 1, max length 64) | yes |  |
+| `razorpay_payment_id` | string (min length 1, max length 64) | yes |  |
+| `razorpay_signature` | string (min length 1, max length 256) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `LiveSession`
+
+#### `GET /api/me/sessions/{session_id}/receipt`
+
+The receipt for a finished session (DUE bills show as unpaid).
+
+**Auth:** Login required (Bearer token)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `session_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `ReceiptOut`
+
 #### `POST /api/me/sessions/{session_id}/stop`
 
 Stop charging now. The bill is worked out up to this moment.
@@ -698,6 +765,161 @@ an unplug, a fault or a recovery. A refusal is a normal answer (accepted = false
 **Responses**
 
 - **200** Successful Response: `SimulateResult`
+
+### Kiosk
+
+#### `POST /api/kiosk/otp-start`
+
+Start the charger of the booking this code belongs to. 5 wrong tries in a row: 2 minutes' wait (429 OTP_COOLDOWN).
+
+**Auth:** Kiosk device key (`X-Device-Key` header; the device sees only its own station)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `x-device-key` | header | string | no |  |
+
+**Request body** (`application/json`): `OtpStartRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `otp` | string (min length 1, max length 12) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `OtpStartOut`
+
+#### `GET /api/kiosk/status`
+
+The status board: every charger's state, progress and free-until time. No names, phone numbers or bills.
+The setup screen also calls this to check a pasted key.
+
+**Auth:** Kiosk device key (`X-Device-Key` header; the device sees only its own station)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `x-device-key` | header | string | no |  |
+
+**Responses**
+
+- **200** Successful Response: `KioskStatus`
+
+#### `POST /api/kiosk/walk-ins`
+
+Take a free charger without a booking: holds it for 3 minutes and returns the payment link to show as a QR.
+
+**Auth:** Kiosk device key (`X-Device-Key` header; the device sees only its own station)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `x-device-key` | header | string | no |  |
+
+**Request body** (`application/json`): `WalkInCreate`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `charger_id` | string (uuid) | yes |  |
+| `amount` | integer (> 0.0) or null | no | One of the offered amounts, in rupees. |
+| `until_next` | boolean | no | Default: `False`. |
+
+**Responses**
+
+- **201** Successful Response: `WalkInOut`
+
+#### `GET /api/kiosk/walk-ins/{walk_in_id}`
+
+Has the walk-in paid yet? Poll this while the QR is on screen.
+
+**Auth:** Kiosk device key (`X-Device-Key` header; the device sees only its own station)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `walk_in_id` | path | string (uuid) | yes |  |
+| `x-device-key` | header | string | no |  |
+
+**Responses**
+
+- **200** Successful Response: `WalkInOut`
+
+#### `POST /api/kiosk/walk-ins/{walk_in_id}/cancel`
+
+Back out of the QR screen: the charger is free again at once.
+
+**Auth:** Kiosk device key (`X-Device-Key` header; the device sees only its own station)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `walk_in_id` | path | string (uuid) | yes |  |
+| `x-device-key` | header | string | no |  |
+
+**Responses**
+
+- **200** Successful Response: `WalkInOut`
+
+### Admin: kiosks
+
+#### `POST /api/admin/devices/{device_id}/disable`
+
+Switch a kiosk off (a lost tablet). Its key stops working at once.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `device_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `DeviceOut`
+
+#### `GET /api/admin/stations/{station_id}/devices`
+
+List Devices
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `station_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: list of `DeviceOut`
+
+#### `POST /api/admin/stations/{station_id}/devices`
+
+Create a kiosk key for a station. The key is in this response only; copy it to the tablet now.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `station_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `DeviceCreate`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string (min length 1, max length 60) | yes | A label for the tablet, e.g. 'Entrance kiosk'. |
+
+**Responses**
+
+- **201** Successful Response: `DeviceCreated`
 
 ## Response shapes
 
@@ -1047,28 +1269,41 @@ Raised with `AppError(status, code, message)`; the front end reacts to `code`. P
 
 | Code | Status | Raised in |
 |---|---|---|
+| `INVALID_AMOUNT` | 400 | `app/features/kiosk/walkin.py` |
 | `INVALID_PAYLOAD` | 400 | `app/features/payments/service.py` |
 | `INVALID_SIGNATURE` | 400 | `app/features/payments/service.py` |
+| `WRONG_OTP` | 400 | `app/features/kiosk/service.py` |
+| `INVALID_DEVICE_KEY` | 401 | `app/features/kiosk/dependencies.py` |
+| `DEVICE_DISABLED` | 403 | `app/features/kiosk/dependencies.py` |
 | `BOOKING_NOT_FOUND` | 404 | `app/features/bookings/service.py`, `app/features/charging/service.py`, `app/features/payments/service.py` |
-| `CHARGER_NOT_FOUND` | 404 | `app/features/bookings/service.py`, `app/features/chargers/service.py` |
+| `CHARGER_NOT_FOUND` | 404 | `app/features/bookings/service.py`, `app/features/chargers/service.py`, `app/features/kiosk/walkin.py` |
+| `DEVICE_NOT_FOUND` | 404 | `app/features/kiosk/admin_router.py` |
+| `NO_RECEIPT` | 404 | `app/features/charging/receipt.py` |
 | `PAYMENT_NOT_FOUND` | 404 | `app/features/payments/service.py` |
-| `SESSION_NOT_FOUND` | 404 | `app/features/charging/service.py` |
-| `STATION_NOT_FOUND` | 404 | `app/features/availability/service.py`, `app/features/stations/service.py` |
+| `SESSION_NOT_FOUND` | 404 | `app/features/charging/service.py`, `app/features/payments/service.py` |
+| `STATION_NOT_FOUND` | 404 | `app/features/availability/service.py`, `app/features/kiosk/admin_router.py`, `app/features/stations/service.py` |
 | `VEHICLE_NOT_FOUND` | 404 | `app/features/vehicles/service.py` |
+| `WALK_IN_NOT_FOUND` | 404 | `app/features/kiosk/walkin.py` |
 | `ACTIVE_HOLD_EXISTS` | 409 | `app/features/bookings/service.py` |
+| `BILL_ALREADY_PAID` | 409 | `app/features/payments/service.py` |
 | `BOOKING_NOT_PAYABLE` | 409 | `app/features/payments/service.py` |
 | `BOOKING_NOT_STARTABLE` | 409 | `app/features/charging/service.py` |
 | `CANNOT_CANCEL` | 409 | `app/features/bookings/service.py` |
-| `CHARGER_BUSY` | 409 | `app/features/bookings/service.py` |
+| `CHARGER_BUSY` | 409 | `app/features/bookings/service.py`, `app/features/kiosk/walkin.py` |
 | `CHARGER_OUT_OF_SERVICE` | 409 | `app/features/bookings/service.py` |
-| `CHARGER_UNAVAILABLE` | 409 | `app/features/charging/service.py` |
+| `CHARGER_UNAVAILABLE` | 409 | `app/features/charging/service.py`, `app/features/kiosk/walkin.py` |
 | `CODE_ALREADY_USED` | 409 | `app/features/bookings/service.py` |
 | `CODE_WINDOW_ENDED` | 409 | `app/features/bookings/service.py` |
 | `DEFAULT_REQUIRED` | 409 | `app/features/vehicles/service.py` |
 | `HOLD_EXPIRED` | 409 | `app/features/payments/service.py` |
 | `ILLEGAL_STATUS_CHANGE` | 409 | `app/features/bookings/state_machine.py` |
+| `NO_BILL_DUE` | 409 | `app/features/payments/service.py` |
 | `NO_CODE_FOR_STATUS` | 409 | `app/features/bookings/service.py` |
 | `NO_ROOM_FOR_INSTANT` | 409 | `app/features/bookings/service.py` |
+| `NO_ROOM_FOR_WALK_IN` | 409 | `app/features/kiosk/walkin.py` |
+| `OTP_NOT_VALID_NOW` | 409 | `app/features/kiosk/service.py` |
+| `PRICE_UNKNOWN` | 409 | `app/features/kiosk/walkin.py` |
+| `SESSION_NOT_ENDED` | 409 | `app/features/charging/receipt.py`, `app/features/payments/service.py` |
 | `SLOT_TAKEN` | 409 | `app/features/bookings/service.py` |
 | `TOO_MANY_VEHICLES` | 409 | `app/features/vehicles/service.py` |
 | `UNPAID_BILL` | 409 | `app/features/bookings/service.py` |
@@ -1083,6 +1318,7 @@ Raised with `AppError(status, code, message)`; the front end reacts to `code`. P
 | `START_IN_PAST` | 422 | `app/features/bookings/service.py` |
 | `START_TOO_FAR` | 422 | `app/features/bookings/service.py`, `app/features/recommendations/service.py` |
 | `UNKNOWN_EVENT` | 422 | `app/features/chargers/service.py` |
+| `OTP_COOLDOWN` | 429 | `app/features/kiosk/service.py` |
 | `SEARCH_BUSY` | 429 | `app/features/geocoding/service.py` |
 | `PAYMENT_PROVIDER_ERROR` | 502 | `app/features/payments/gateway.py` |
 | `DATABASE_UNAVAILABLE` | 503 | `app/features/search/router.py`, `app/features/stations/router.py` |

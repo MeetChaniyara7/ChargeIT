@@ -34,6 +34,12 @@ class Gateway(Protocol):
     def create_order(self, amount_paise: int, receipt: str, notes: dict[str, str]) -> str:
         """Create an order and return Razorpay's order id."""
 
+    def create_payment_link(self, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]) -> tuple[str, str]:
+        """Create a payment link (what the kiosk shows as a QR) and return (link id, URL)."""
+
+    def payment_link_status(self, link_id: str) -> tuple[str, str | None]:
+        """Ask Razorpay about a link: (status, id of the captured payment or None). Status is created, paid, cancelled or expired."""
+
 
 class RazorpayGateway:
     """The real thing. It talks to Razorpay over the network, so tests swap it for a fake."""
@@ -50,6 +56,34 @@ class RazorpayGateway:
             logger.exception("Razorpay order creation failed")
             raise AppError(502, "PAYMENT_PROVIDER_ERROR", "The payment service is not responding. Please try again.") from exc
         return order["id"]
+
+    def create_payment_link(self, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]) -> tuple[str, str]:
+        import razorpay
+
+        client = razorpay.Client(auth=(require_setting("razorpay_key_id"), require_setting("razorpay_key_secret")))
+        try:
+            link = client.payment_link.create(
+                {
+                    "amount": amount_paise, "currency": "INR", "accept_partial": False, "reference_id": reference_id,
+                    "description": description, "notes": notes, "reminder_enable": False,
+                }
+            )
+        except Exception as exc:
+            logger.exception("Razorpay payment link creation failed")
+            raise AppError(502, "PAYMENT_PROVIDER_ERROR", "The payment service is not responding. Please try again.") from exc
+        return link["id"], link["short_url"]
+
+    def payment_link_status(self, link_id: str) -> tuple[str, str | None]:
+        import razorpay
+
+        client = razorpay.Client(auth=(require_setting("razorpay_key_id"), require_setting("razorpay_key_secret")))
+        try:
+            link = client.payment_link.fetch(link_id)
+        except Exception as exc:
+            logger.exception("Razorpay payment link lookup failed")
+            raise AppError(502, "PAYMENT_PROVIDER_ERROR", "The payment service is not responding. Please try again.") from exc
+        captured = next((p.get("payment_id") for p in link.get("payments") or [] if p.get("status") == "captured"), None)
+        return link.get("status", "created"), captured
 
 
 def get_gateway() -> Gateway:

@@ -1,6 +1,6 @@
 # ChargeSpot: what it does, what is built, what is not
 
-Everything here comes from the code and the plan in `docs/phases.md`. Where the code does not say, it says **TODO: confirm with me**. Status as of 2026-10-21 (the Phase 5 work is on branch `phase-5-jobs-realtime`, tested but not yet committed).
+Everything here comes from the code and the plan in `docs/phases.md`. Where the code does not say, it says **TODO: confirm with me**. Status as of 2026-10-22 (Phases 0 to 5 are on `main`; the Phase 6 work is on branch `phase-6-kiosk`, tested but not yet committed or approved).
 
 ## What the project is
 
@@ -42,32 +42,40 @@ ChargeSpot is "BookMyShow for EV charging" (a college final-year project, free t
 - Charger situations: a booking is **moved** to another free charger (notice and toast), the driver is **warned** when an outside driver is still charging, or the booking is **cancelled with a full refund** and three nearby alternatives are shown.
 
 ### Running by itself
+
 - SQL jobs (`database/migrations/011_jobs.sql`) run every minute through `pg_cron` on Supabase and lazily inside the API: expire holds, mark no-shows, resolve occupied starts, auto-stop sessions, reserve chargers 15 minutes ahead.
 - Charger simulator (`simulate_charger_event`, admin endpoint, and `backend/scripts/simulate.py`): outside start (refused while reserved), outside stop, unplug, fault, recover; every event logged.
+
+### The station kiosk (Phase 6, `frontend/kiosk/`)
+- A shared tablet app: a status board (every charger's state, kW, price, "free until", charging progress, walk-in money used), no names, phone numbers or bills of app users; sets itself up once with a pasted device key; goes back to the board after 30 seconds without a touch; a gentle "attract" loop after 2 minutes; a "Connection lost" cover that goes away by itself.
+- **Start with a code:** a number pad for the 6-digit booking code; the server checks it for this station and its time window and starts that booking's charger; "Wrong code, 3 tries left"; 5 wrong tries in a row start a 2-minute wait; 20 wrong in 10 minutes raise an admin alert (`admin_alerts`).
+- **Walk-in:** pick a free charger, pick ₹100 / ₹200 / ₹500 or "until the next booking" (each with its kWh), scan the Razorpay payment-link QR with any UPI app (3-minute hold, countdown); charging starts once Razorpay confirms; the tile later shows "Done · used ₹186 · ₹14 refunded". Charging stops when the money is used up, 5 minutes before the next booking, or at the end of the window; the unused money is recorded as a refund.
+- Device keys (`ks_<prefix>_<secret>`, hashed in the database, one device = one station) made with `python -m scripts.make_kiosk_key` or `POST /api/admin/stations/{id}/devices`. Staff steps and a manual test script: `docs/kiosk.md`.
+
+### Paying the energy bill
+- "Pay ₹X" on the charging summary and on the Payment due tab opens Razorpay Checkout (test mode); the server verifies the signature and marks the bill paid; success, decline and closing the window are handled. The Explore/station banner says "Clear ₹X to book again" while a bill is due.
+- Receipt page for a charging session (`/receipts/session/:id`): station, charger, times, kWh, rate, total, payment id, "Paid ✓", with Print / Save as PDF through the browser.
 
 ### Data
 - Gujarat stations from Open Charge Map and OpenStreetMap plus 10 hand-verified Ahmedabad ones, cleaned and de-duplicated; missing chargers/power/prices/ratings generated and labelled; demo accounts, a week of demo bookings and kiosk device rows (`database/`). Details in `docs/data.md`.
 
 ### Engineering
-- Backend tests 555, database tests 119, web unit tests 17 + shared 40 (run on 2026-10-21); `npm run build` type-checks; `npm run lint`.
+- Backend tests 638, database tests 125, web unit tests 17, kiosk 15 + shared 40 (run on 2026-10-22); `npm run build` type-checks; `npm run lint`.
 - A design system ("Midnight Charge", `docs/ui-flow.md`) with a component library and a development-only style guide at `/dev/ui`.
 
 ## Planned or half-built
 
 | Item | Evidence in the code | State |
 |---|---|---|
-| **Station kiosk app** (status board, OTP start, walk-in QR) | `frontend/kiosk/` does not exist. Tables `station_devices` and `otp_attempts` exist (migration 005) and demo kiosk rows are seeded, but no API reads them. `features/charging/service.py` says starting a session is "what the kiosk does (Phase 6)". | Not started (Phase 6) |
-| **Start charging with the code** | Nothing checks a typed code today. `otp.matches()` and `is_valid_now()` exist, unused by any route. The admin tool `POST /api/admin/bookings/{id}/start` and `scripts/simulate.py start` stand in. | Half-built |
-| **Walk-in bookings** (`source = 'WALK_IN'`) | Allowed by the database transitions, handled in `auto_stop_sessions` and `finish_session` (`PREPAID_SETTLED`), `walkin_*` rules in `BOOKING_RULES`. No endpoint or screen creates one. | Database side only |
-| **Paying the energy bill** | Sessions get `bill_amount` and `bill_status = 'DUE'`; `payments.purpose` allows `ENERGY`; `SessionSummary.tsx` has a disabled Pay button ("arrives in the next update"); the "Payment due" tab only lists bills. There is no `POST /me/sessions/{id}/pay`. | Half-built (Phase 6) |
 | **Real refunds through Razorpay** | `cancel()` and `_refund_in_full()` record the refund on the booking and payment only; no call to Razorpay's refund API. | Recorded only (test mode) |
-| **Razorpay webhook** | `POST /api/payments/webhook` is implemented and tested, but no webhook is registered (needs a public URL). | Waiting for deployment |
-| **Admin area** (`/admin`) | `require_admin` and three admin-only endpoints exist (`POST /api/stations`, simulate, start). No admin pages, reports, kiosk-key management or alerts. | Not started (Phase 7) |
+| **Razorpay webhook** | `POST /api/payments/webhook` handles `payment.captured`, `order.paid` and `payment_link.paid` and is tested, but no webhook is registered (needs a public URL). Until then walk-ins are confirmed by the kiosk asking Razorpay about the payment link. | Waiting for deployment |
+| **Admin area** (`/admin`) | `require_admin` and admin-only endpoints exist (create station, simulate, start, kiosk keys). No admin pages, reports, alerts list or operator settlement. | Not started (Phase 7) |
 | **Deployment** (Render, Vercel), **CI** (GitHub Actions) | No deploy config, Dockerfile or workflow in the repo. | Not started (Phase 7) |
 | **Final README, demo script, booking-flow docs** | `README.md` says "the full README arrives in Phase 7". | Not started |
 | **Two-wheeler section** | Stations tagged `TWO_WHEELER` are stored and hidden everywhere (`vehicle_category = 'FOUR_WHEELER'` filter). | Data kept, no UI |
 | **Phone number, email verification, password reset** | `users.phone` exists but no code reads or writes it. No verification or reset flow found. | Wanted by the owner; not started. Email and SMS services are not free, so ask before choosing one |
 | **Admin "simulate external session" button** | Only the API and the command line exist. | API only |
+| **Kiosk on a real tablet; kiosk Realtime** | Checked in desktop Chrome at 1280 x 800 and 1024 x 768 only. The kiosk polls the API every 2 to 4 seconds instead of using Supabase Realtime. | Owner's check pending |
 
 ## Known limitations (from the code)
 

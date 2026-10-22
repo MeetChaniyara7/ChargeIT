@@ -159,7 +159,7 @@ backend/
     bookings/                    state_machine.py, otp.py, refunds.py, service.py, repository.py
     payments/                    Razorpay orders, signature check, webhook, refunds
     charging/                    sessions: live numbers, stop, start; energy.py (the energy formula); billing
-    kiosk/                       device auth, OTP start, walk-in start, rate limits  (PLANNED, Phase 6: not built)
+    kiosk/                       device keys, status board, OTP start, walk-ins, admin key endpoints
     chargers/                    charger simulator (fake OCPP events), admin endpoint
     jobs/                        lazy checks: runs the SQL background jobs for a station before a read
     geocoding/                   Nominatim proxy + cache
@@ -178,7 +178,7 @@ frontend/
     src/features/charging/         live session page, energy bill payment
     src/features/admin/            station/charger editor, reports
     src/lib/                       api client, realtime
-  kiosk/                         the station screen (from Phase 6)
+  kiosk/                         the station screen (built in Phase 6)
     src/features/device/           one-time device setup (API key)
     src/features/status-board/     charger tiles: availability + progress
     src/features/otp-start/        "Start with OTP"
@@ -451,6 +451,8 @@ For a signed-in user who is already at, or near, a free charger:
 
 ### 7.3 Kiosk walk-in (no app, no account)
 
+> Built in Phase 6: `features/kiosk/walkin.py`, migration 014 (settlement) and `frontend/kiosk/`. While no webhook is registered, the kiosk's own poll asks Razorpay about the payment link; a payment that arrives late is refunded in full. See section 18 and `docs/FLOW.md` section 12.
+
 ```mermaid
 sequenceDiagram
     actor W as Walk-in driver
@@ -499,6 +501,8 @@ We cannot connect to real chargers, so the API includes a **charger simulator** 
 
 ## 8. Payments and refunds
 
+> Built in Phase 6: the energy bill (`ENERGY`, paid in the web app) and the walk-in prepayment (`WALKIN_PREPAID`, a Razorpay payment link). Refunds are still recorded, not sent.
+
 | What | Who pays | How | Verified by |
 |---|---|---|---|
 | **Booking fee ₹199** (APP bookings) | Signed-in user | Razorpay Checkout in the web app | Razorpay signature, checked by the API |
@@ -519,6 +523,8 @@ We cannot connect to real chargers, so the API includes a **charger simulator** 
 ---
 
 ## 9. The station kiosk
+
+> Built in Phase 6 (`frontend/kiosk/`, `backend/app/features/kiosk/`). The kiosk polls the API instead of using Realtime, so no Supabase key sits on a shared tablet. Staff steps and the manual test script: `docs/kiosk.md`.
 
 **One kiosk per station, shared by everyone**, like an ATM. Each person uses it for under a minute. Everything personal happens on their own phone.
 
@@ -764,11 +770,11 @@ With **3 people**, D's work is shared between B (kiosk API, admin) and C (kiosk 
 
 ## 18. What is built today (code-derived)
 
-Sections 1 to 17 are the design and the reasons, written during planning. This section describes **what the code does today** (as of 2026-10-21, the Phase 5 work included). When it disagrees with an earlier section, the code wins and this section says so. Read it with `docs/FLOW.md` (step-by-step flows), `docs/SCHEMA.md` (tables) and `docs/API.md` (endpoints).
+Sections 1 to 17 are the design and the reasons, written during planning. This section describes **what the code does today** (as of 2026-10-21, Phases 0 to 6 included). When it disagrees with an earlier section, the code wins and this section says so. Read it with `docs/FLOW.md` (step-by-step flows), `docs/SCHEMA.md` (tables) and `docs/API.md` (endpoints).
 
 ### 18.1 In one paragraph
 
-ChargeSpot is a three-part system in one repository: a **React web app** for drivers, a **FastAPI API** that holds every rule, and a **PostgreSQL database on Supabase** that enforces the most important rules itself (no double booking, legal status changes only) and runs the background jobs (`pg_cron`). The browser also listens to **Supabase Realtime** for "something changed" nudges, and the API talks to a few free outside services. A station **kiosk** app is planned but not built.
+ChargeSpot is a three-part system in one repository: a **React web app** for drivers, a **FastAPI API** that holds every rule, and a **PostgreSQL database on Supabase** that enforces the most important rules itself (no double booking, legal status changes only) and runs the background jobs (`pg_cron`). The browser also listens to **Supabase Realtime** for "something changed" nudges, and the API talks to a few free outside services. A station **kiosk** app (`frontend/kiosk`) shows the chargers on a shared tablet, starts charging with a code and takes walk-in payments by QR.
 
 ### 18.2 Diagram
 
@@ -799,7 +805,7 @@ flowchart LR
     end
 
     GOOGLE["Google Sign-In"]
-    RZP["Razorpay (test mode)"]
+    RZP["Razorpay (test mode)<br/>orders + payment links"]
     OSRM["OSRM (routing)"]
     NOM["Nominatim (geocoding)"]
     TILES["OpenStreetMap tiles"]
@@ -810,14 +816,14 @@ flowchart LR
     UI -- "ID token" --> GOOGLE
     SERVICES -- "verify token / code" --> GOOGLE
     UI -- "Checkout script + popup" --> RZP
-    SERVICES -- "create order" --> RZP
+    SERVICES -- "create order / payment link,<br/>ask link status" --> RZP
     RZP -. "webhook (not registered yet)" .-> ROUTERS
     SERVICES --> OSRM
     SERVICES --> NOM
     UI --> TILES
 
-    KIOSK["Station kiosk app<br/>(frontend/kiosk): NOT BUILT"]
-    KIOSK -. "planned: X-Device-Key" .-> ROUTERS
+    KIOSK["Station kiosk app<br/>(frontend/kiosk, shared tablet)"]
+    KIOSK -- "X-Device-Key, polls every 2-4 s<br/>(no Supabase key on the tablet)" --> ROUTERS
 ```
 
 ### 18.3 Components
@@ -829,15 +835,15 @@ flowchart LR
 | **API** | `backend/app/` | Every business rule; authentication; talks to the outside services | Python 3.12, FastAPI, SQLAlchemy 2, psycopg 3, Pydantic, PyJWT, bcrypt, httpx, razorpay SDK |
 | **Database** | `database/migrations/` (schema), Supabase | Stores everything; enforces overlaps and status rules; runs the jobs | PostgreSQL 17 with `btree_gist`, `pg_trgm`, `pg_cron` |
 | **Database tooling** | `database/` | Migration runner, station imports, synthetic and demo data, saved SQL | `python -m database.pipeline`, `python -m database.migrate` |
-| **Demo tools** | `backend/scripts/` | `simulate.py` (charger events, start a session, run jobs), `make_admin.py` | Run with `python -m scripts.<name>` from `backend/` |
-| **Kiosk app** | `frontend/kiosk/` | Station status board, OTP start, walk-in QR payment | **Does not exist yet** (Phase 6) |
+| **Demo tools** | `backend/scripts/` | `simulate.py` (charger events, start a session, run jobs), `make_admin.py`, `make_kiosk_key.py` | Run with `python -m scripts.<name>` from `backend/` |
+| **Kiosk app** | `frontend/kiosk/` (`@chargespot/kiosk`) | Station status board, start with a code, walk-in QR payment | React 19, Vite 8, Tailwind v4, `qrcode.react`; dev port 5174; no router (a small state machine in `app/App.tsx`); key pasted once on the setup screen |
 
 #### Outside services
 
 | Service | Used for | Called from | Limits and fallback |
 |---|---|---|---|
 | **Google Sign-In** | Login | `features/auth/google.py`; the button in `features/auth/GoogleSignInButton.tsx` | Needs `GOOGLE_CLIENT_ID`; email login works without it |
-| **Razorpay (test mode)** | The ₹199 booking fee | `features/payments/gateway.py`; Checkout in `lib/razorpay.ts` | Test keys only; no real money; refunds are recorded, not sent |
+| **Razorpay (test mode)** | The ₹199 booking fee, the energy bill (orders), walk-in prepayments (payment links) | `features/payments/gateway.py`; Checkout in `lib/razorpay.ts`; the kiosk shows the link as a QR | Test keys only; no real money; refunds are recorded, not sent; a link must live at least 15 minutes, so the 3-minute hold is ours |
 | **OSRM** public server | Drive times for recommendations | `features/recommendations/osrm.py` | 3 s timeout, 60 s cache; falls back to straight-line at 25 km/h |
 | **Nominatim** | Place search ("Bopal") | `features/geocoding/service.py` | 1 request per second, only on Enter, 30-day cache in `geocode_cache` |
 | **OpenStreetMap tiles** | Map background | `features/stations/StationMap.tsx` | Fair use; attribution in `components/layout/Footer.tsx` |
@@ -858,8 +864,9 @@ flowchart LR
 | `search` | Suggestions (stations, operators, cities) | `repository.py` (`pg_trgm`) |
 | `vehicles` | A user's vehicles | `service.py` |
 | `bookings` | Holds, instant bookings, codes, cancel, refunds | `state_machine.py`, `otp.py`, `refunds.py` (pure), `alternatives.py`, `instant.py`, `service.py` |
-| `payments` | Razorpay order, verify, webhook | `gateway.py`, `service.py` (`confirm_payment`) |
-| `charging` | Sessions: live numbers, stop, start | `energy.py` (pure), `service.py` |
+| `payments` | Razorpay orders (booking fee, energy bill), verify, webhook (also `payment_link.paid`) | `gateway.py` (orders, payment links), `service.py` (`confirm_payment`, `create_energy_order`, `verify_energy`) |
+| `charging` | Sessions: live numbers, stop, start, bill payment routes, receipt | `energy.py` (pure), `service.py`, `receipt.py`, `router.py` |
+| `kiosk` | Device keys, status board, OTP start with cooldown and alerts, walk-ins | `keys.py`, `dependencies.py` (`get_current_device`), `service.py` (board, `otp_start`), `walkin.py` (create, poll Razorpay, confirm, cancel), `router.py` (`/api/kiosk`), `admin_router.py` (keys) |
 | `chargers` | Admin charger simulator | `service.py` |
 | `jobs` | Lazy job checks | `lazy.py` |
 | `core/` | Errors, logging, slots, geo, connector labels | `errors.py` (`AppError`), `slots.py` (IST, 30-minute blocks) |
@@ -876,7 +883,9 @@ src/features/<name>/       pages, components and hooks together: auth, home, sta
 src/lib/                   api.ts (apiFetch), useApiQuery, realtime + useRealtimeRefresh, razorpay, calendar, timers
 ```
 
-Routes (all signed-in routes sit inside `ProtectedRoute` + `AppLayout`): `/` (landing), `/login`, `/register`, `/explore`, `/stations/:stationId`, `/book/:bookingId`, `/tickets/:bookingId`, `/receipts/:bookingId`, `/bookings`, `/charging`, `/charging/:sessionId`, `/profile`, `/profile/vehicles`, `/dev/ui` (development builds only); `/dashboard` redirects to `/explore`.
+Routes (all signed-in routes sit inside `ProtectedRoute` + `AppLayout`): `/` (landing), `/login`, `/register`, `/explore`, `/stations/:stationId`, `/book/:bookingId`, `/tickets/:bookingId`, `/receipts/:bookingId` (booking fee), `/receipts/session/:sessionId` (energy bill), `/bookings`, `/charging`, `/charging/:sessionId`, `/profile`, `/profile/vehicles`, `/dev/ui` (development builds only); `/dashboard` redirects to `/explore`.
+
+The kiosk app (`frontend/kiosk/src/`) has `app/App.tsx` (the state machine: board, code pad, walk-in, started, setup), `screens/`, `components/` (button, charger tile, keypad, overlay), and `lib/` (`api.ts` with the device key, `useKioskStatus`, `useIdleTimer`, `useCountdown`, pure `otp.ts`, `tiles.ts`, `format.ts`). It reuses `@chargespot/shared` and the design tokens; the root font size is 20 px so everything scales for a metre's reading distance.
 
 Patterns: data comes from `useApiQuery(key, fetcher)` (keeps old data while loading, aborts stale requests); filters live in the URL; colours, radii, shadows and fonts come only from `frontend/shared/src/styles/tokens.css`; the web app never decides availability, prices or refunds (it displays what the API says).
 
@@ -895,6 +904,8 @@ Patterns: data comes from `useApiQuery(key, fetcher)` (keeps old data while load
 | Same energy formula everywhere | `session_energy_kwh` (SQL) = `features/charging/energy.py` (tested equal); numbers in the `job_rules` table equal `config.py` (tested) |
 | Realtime carries no data | Migration 013 sends only `{station_id, charger_id}`; the web app always re-fetches |
 | Row-level security on every table | Migration 009 and each later table (a test fails if one is missed) |
+| A kiosk acts only on its own station | `features/kiosk/dependencies.py` finds the device by key prefix and compares the SHA-256 in constant time; every kiosk query filters on `device.station_id` |
+| A walk-in pays first | Payment link verified by Razorpay (webhook or poll) before the session starts; the bill never exceeds the prepaid amount (`finish_session`, migration 014) |
 | Generated values are labelled | `data_source`, `estimated_fields`; the UI shows an "Approximate" tag |
 
 ### 18.7 Environments
@@ -907,7 +918,9 @@ Patterns: data comes from `useApiQuery(key, fetcher)` (keeps old data while load
 
 ### 18.8 Differences between the plan and the code
 
-- The plan's kiosk (`frontend/kiosk/`, `app/features/kiosk/`) and admin area (`/admin`) are not built. The tables for kiosks (`station_devices`, `otp_attempts`) exist but nothing uses them.
-- Payment of the **energy bill** is not built; sessions are billed (`bill_status = 'DUE'`) and the web app shows the amount with a disabled Pay button.
-- The Razorpay **webhook** is implemented but not registered with Razorpay.
+- The admin area (`/admin`) is not built. Kiosk keys are made with `python -m scripts.make_kiosk_key` (or the admin API), and kiosk alerts are stored in `admin_alerts` with no page to show them yet.
+- The kiosk does not use Supabase Realtime: it polls (status board every 4 seconds, a walk-in every 2 seconds), so the tablet holds no Supabase key.
+- Kiosk and bill routes are under `/api` (`/api/kiosk/...`, `/api/me/sessions/{id}/pay`), not `/kiosk/...` as the plan wrote.
+- The Razorpay **webhook** is implemented (booking fee, energy bill, `payment_link.paid`) but not registered with Razorpay. Until it is, a walk-in is confirmed by the kiosk asking Razorpay about the payment link.
+- The wrong-code rule is "every 5th wrong try in a row starts a 2-minute wait", counted from `otp_attempts` (no extra column).
 - One `pg_cron` entry runs all five jobs in order, instead of five separate schedules.

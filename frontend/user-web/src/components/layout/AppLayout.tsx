@@ -73,7 +73,7 @@ function Frame() {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-40 border-b border-border bg-bg">
+      <header className="sticky top-0 z-40 border-b border-border bg-bg print:hidden">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 lg:px-8">
           <Logo to="/explore" />
 
@@ -122,7 +122,7 @@ function Frame() {
 
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
       >
         <ul className="mx-auto flex h-16 max-w-md items-stretch">
           {NAV.map(({ to, label, icon: Icon }) => (

@@ -2,6 +2,8 @@ import type { components } from '@chargespot/shared';
 
 export type LiveSession = components['schemas']['LiveSession'];
 export type SimulateResult = components['schemas']['SimulateResult'];
+export type EnergyOrder = components['schemas']['EnergyOrderOut'];
+export type SessionReceipt = components['schemas']['ReceiptOut'];
 
 /** Why a session ended, in words a driver understands. */
 export const END_REASONS: Record<string, string> = {

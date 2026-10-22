@@ -5,10 +5,12 @@
   "description": "ChargeSpot: book EV charging slots, start charging with an OTP, pay in the app.",
   "workspaces": [
     "frontend/user-web",
+    "frontend/kiosk",
     "frontend/shared"
   ],
   "scripts": {
     "dev:web": "npm run dev --workspace @chargespot/user-web",
+    "dev:kiosk": "npm run dev --workspace @chargespot/kiosk",
     "dev:api": "cd backend && python -m uvicorn app.main:app --reload --port 8000",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

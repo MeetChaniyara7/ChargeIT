@@ -20,6 +20,8 @@ from app.features.bookings.router import router as bookings_router
 from app.features.chargers.router import router as chargers_router
 from app.features.charging.router import router as charging_router
 from app.features.geocoding.router import router as geocoding_router
+from app.features.kiosk.admin_router import router as kiosk_admin_router
+from app.features.kiosk.router import router as kiosk_router
 from app.features.payments.router import router as payments_router
 from app.features.recommendations.router import router as recommendations_router
 from app.features.search.router import router as search_router
@@ -58,6 +60,8 @@ def create_app() -> FastAPI:
     app.include_router(payments_router)
     app.include_router(charging_router)
     app.include_router(chargers_router)
+    app.include_router(kiosk_router)
+    app.include_router(kiosk_admin_router)
 
     @app.get("/health", tags=["Health"])
     def health():

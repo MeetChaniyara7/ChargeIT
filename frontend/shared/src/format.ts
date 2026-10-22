@@ -1,6 +1,6 @@
 // Display helpers. Times are stored in UTC and always shown in India time (IST).
 
-import { DISPLAY_TIME_ZONE } from './constants';
+import { DISPLAY_TIME_ZONE } from './constants.ts';
 
 const inrFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',

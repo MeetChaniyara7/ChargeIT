@@ -1,4 +1,4 @@
-"""Paying the booking fee: create the order, verify the result, handle the webhook.
+"""Paying the booking fee and the energy bill: create the order, verify the result, handle the webhook.
 
 Rules (docs/architecture.md section 8):
 - Amounts are calculated here, on the server. The browser never sends one.
@@ -7,6 +7,9 @@ Rules (docs/architecture.md section 8):
 - Each webhook event is processed once, however many times Razorpay sends it.
 - Verify and webhook can both arrive (or arrive late, or in either order): whichever comes
   second finds the payment already CAPTURED and changes nothing.
+- The energy bill of a finished session (purpose ENERGY) follows the same steps; the amount is the
+  bill the server worked out when the session ended.
+- A walk-in's prepayment (a payment link) is handled in features/kiosk/walkin.py; its webhook arrives here.
 """
 
 import json
@@ -25,9 +28,13 @@ from app.config import BOOKING_RULES, get_settings, require_setting
 from app.core.errors import AppError
 from app.features.bookings import otp, service as bookings, state_machine
 from app.features.bookings.models import Booking
+from app.features.charging import service as charging
+from app.features.charging.models import ChargingSession
+from app.features.charging.schemas import LiveSession
+from app.features.kiosk import walkin
 from app.features.payments.gateway import Gateway, verify_payment_signature, verify_webhook_signature
 from app.features.payments.models import Payment, WebhookEvent
-from app.features.payments.schemas import OrderOut, VerifyOut, VerifyRequest
+from app.features.payments.schemas import EnergyOrderOut, OrderOut, VerifyOut, VerifyRequest
 
 # Checkout closes this many seconds before the hold would run out.
 CHECKOUT_MARGIN_SECONDS = 15
@@ -36,7 +43,7 @@ MIN_CHECKOUT_SECONDS = 20
 
 @dataclass
 class Confirmation:
-    outcome: str  # CONFIRMED | ALREADY_CONFIRMED | REFUNDED_LATE
+    outcome: str  # CONFIRMED | ALREADY_CONFIRMED | REFUNDED_LATE | PAID (an energy bill)
     booking: Booking
     otp: str | None = None
     refund: Decimal = Decimal(0)
@@ -127,10 +134,12 @@ def _rebook_expired(db: Session, payment: Payment, old: Booking, now: datetime) 
 
 
 def confirm_payment(db: Session, payment: Payment, provider_payment_id: str, now: datetime, actor: str) -> Confirmation:
-    """A verified payment: mark it captured and confirm the booking. Safe to call twice for one payment."""
+    """A verified payment: mark it captured and confirm the booking (or settle the energy bill). Safe to call twice for one payment."""
     booking = _lock_booking(db, payment.booking_id)
     if payment.status != "CREATED":
         return Confirmation("ALREADY_CONFIRMED", booking, refund=Decimal(payment.refunded_amount))
+    if payment.purpose == "ENERGY":
+        return _confirm_energy(db, payment, booking, provider_payment_id, now)
 
     payment.provider_payment_id = provider_payment_id
     payment.status = "CAPTURED"
@@ -181,6 +190,75 @@ def verify(db: Session, user_id: UUID, request: VerifyRequest, now: datetime) ->
     )
 
 
+# ---------------------------------------------------------------- the energy bill
+
+def _confirm_energy(db: Session, payment: Payment, booking: Booking, provider_payment_id: str, now: datetime) -> Confirmation:
+    session = db.scalars(select(ChargingSession).where(ChargingSession.session_id == payment.session_id).with_for_update()).one()
+    payment.provider_payment_id = provider_payment_id
+    payment.status = "CAPTURED"
+    if session.bill_status != "DUE":  # paid twice (two tabs, say): the second payment goes back in full
+        return _refund_in_full(payment, booking)
+    session.bill_status = "PAID"
+    session.paid_at = now
+    return Confirmation("PAID", booking)
+
+
+def create_energy_order(db: Session, user_id: UUID, session_id: UUID, gateway: Gateway) -> EnergyOrderOut:
+    """The Razorpay order for a finished session's bill. Asking again returns the same order."""
+    row = db.execute(
+        select(ChargingSession, Booking.user_id)
+        .join(Booking, Booking.booking_id == ChargingSession.booking_id)
+        .where(ChargingSession.session_id == session_id)
+        .with_for_update(of=ChargingSession)
+    ).first()
+    if row is None or row[1] != user_id:  # another driver's session looks like one that does not exist
+        raise AppError(404, "SESSION_NOT_FOUND", "Charging session not found.")
+    session = row[0]
+    if session.ended_at is None:
+        raise AppError(409, "SESSION_NOT_ENDED", "Charging is still going. You can pay when it ends.")
+    if session.bill_status == "PAID":
+        raise AppError(409, "BILL_ALREADY_PAID", "This bill is already paid.")
+    if session.bill_status != "DUE":
+        raise AppError(409, "NO_BILL_DUE", "There is nothing to pay for this session.")
+
+    payment = db.scalar(
+        select(Payment).where(Payment.session_id == session_id, Payment.purpose == "ENERGY", Payment.status == "CREATED")
+    )
+    if payment is None:
+        amount = Decimal(session.bill_amount)  # the bill the server worked out when charging ended
+        order_id = gateway.create_order(
+            int(amount * 100), receipt=str(session_id), notes={"purpose": "ENERGY", "session_id": str(session_id)}
+        )
+        payment = Payment(
+            booking_id=session.booking_id, session_id=session_id, purpose="ENERGY", provider="razorpay",
+            provider_order_id=order_id, amount=amount, currency="INR", status="CREATED",
+        )
+        db.add(payment)
+        db.commit()
+    amount = Decimal(payment.amount)
+    return EnergyOrderOut(
+        session_id=session_id, order_id=payment.provider_order_id, amount=float(amount), amount_paise=int(amount * 100),
+        currency=payment.currency, key_id=require_setting("razorpay_key_id"),
+    )
+
+
+def verify_energy(db: Session, user_id: UUID, session_id: UUID, request: VerifyRequest, now: datetime) -> LiveSession:
+    """The browser says the bill was paid. Believe it only if the signature is genuine."""
+    if not verify_payment_signature(
+        request.razorpay_order_id, request.razorpay_payment_id, request.razorpay_signature, require_setting("razorpay_key_secret")
+    ):
+        raise AppError(400, "INVALID_SIGNATURE", "The payment could not be verified.")
+    payment = _lock_payment(db, request.razorpay_order_id)
+    if payment is None or payment.purpose != "ENERGY" or payment.session_id != session_id:
+        raise AppError(404, "PAYMENT_NOT_FOUND", "Payment not found.")
+    owner = db.scalar(select(Booking.user_id).where(Booking.booking_id == payment.booking_id))
+    if owner != user_id:
+        raise AppError(404, "PAYMENT_NOT_FOUND", "Payment not found.")
+    confirm_payment(db, payment, request.razorpay_payment_id, now, actor="USER")
+    db.commit()
+    return charging.get_session(db, user_id, session_id, now)
+
+
 # ---------------------------------------------------------------- webhooks
 
 def _event_ids(payload: dict) -> tuple[str | None, str | None]:
@@ -216,7 +294,15 @@ def handle_webhook(db: Session, body: bytes, signature: str, event_id: str | Non
         return "duplicate"
 
     status = "ignored"
-    if event_type in ("payment.captured", "order.paid"):
+    if event_type == "payment_link.paid":
+        entities = payload.get("payload", {})
+        link_id = entities.get("payment_link", {}).get("entity", {}).get("id")
+        payment_id = entities.get("payment", {}).get("entity", {}).get("id")
+        payment = _lock_payment(db, link_id) if link_id else None
+        if payment is not None and payment.purpose == "WALKIN_PREPAID" and payment_id:
+            walkin.confirm_payment(db, payment, payment_id, now, actor="SYSTEM")
+            status = "processed"
+    elif event_type in ("payment.captured", "order.paid"):
         order_id, payment_id = _event_ids(payload)
         payment = _lock_payment(db, order_id) if order_id else None
         if payment is not None and payment_id:

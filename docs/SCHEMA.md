@@ -1,11 +1,12 @@
 # Database schema
 
-PostgreSQL (Supabase in production, plain PostgreSQL for tests). This file was generated from a database with **all 13 migrations applied** (`database/migrations/001` to `013`). The migration files are the source of truth: never edit an applied one, add a new numbered file. Every table has row-level security switched on with no policies, so Supabase's public REST API can read and write nothing; only the API (connecting as the table owner) can.
+PostgreSQL (Supabase in production, plain PostgreSQL for tests). This file was generated from a database with **all 14 migrations applied** (`database/migrations/001` to `014`). The migration files are the source of truth: never edit an applied one, add a new numbered file. Every table has row-level security switched on with no policies, so Supabase's public REST API can read and write nothing; only the API (connecting as the table owner) can.
 
 ## Overview
 
 | Table | Migration | Purpose | SQLAlchemy model |
 |---|---|---|---|
+| `admin_alerts` | 014 | Flags the system raises for the admin page (kiosk code guessing today). Phase 7 shows them. | none (raw SQL only) |
 | `allowed_booking_transitions` | 004 | The legal status moves, as data. The trigger reads it; `state_machine.py` has an identical copy (a test compares them). | none (raw SQL only) |
 | `booking_events` | 004 | History of every status change, written by the trigger (who, why, when). Also a row when a booking is moved to another charger. | none (raw SQL only) |
 | `bookings` | 004 | Every way a charger gets used (app, instant, walk-in). The exclusion constraint forbids two live bookings overlapping on one charger; a trigger allows only legal status changes. | `backend/app/features/bookings/models.py` |
@@ -15,10 +16,10 @@ PostgreSQL (Supabase in production, plain PostgreSQL for tests). This file was g
 | `geocode_cache` | 008 | Remembered Nominatim answers (30 days) so a place is looked up once. | none (raw SQL only) |
 | `job_rules` | 011 | Numbers the SQL jobs read (lock minutes, no-show minutes, efficiency...). A test checks they equal `backend/app/config.py`. | none (raw SQL only) |
 | `operators` | 003 | Companies that run stations (Tata Power, Jio-bp...). Spelling variants are merged on import, so the name is unique. | `backend/app/features/stations/models.py` |
-| `otp_attempts` | 005 | Every code typed at a kiosk, for the wrong-guess cooldown. Not used by any code yet. | none (raw SQL only) |
-| `payments` | 007 | Razorpay payments: the booking fee today; energy bills and walk-in prepayments are designed for but not built. | `backend/app/features/payments/models.py` |
+| `otp_attempts` | 005 | Every code typed at a kiosk, right or wrong: 5 wrong in a row means a 2-minute wait, 20 wrong in 10 minutes raises an admin alert. | none (raw SQL only) |
+| `payments` | 007 | Razorpay payments: the booking fee, the energy bill (`ENERGY`) and a walk-in's prepayment (`WALKIN_PREPAID`, a payment link). Refunds are recorded here, not sent. | `backend/app/features/payments/models.py` |
 | `schema_migrations` | (runner) | Which migration files have been applied. Created by `database/migrate.py`, not by a migration. | none (raw SQL only) |
-| `station_devices` | 005 | One kiosk tablet per station, signing in with an API key stored as a hash. Rows exist (demo kiosks) but no API uses them yet. | none (raw SQL only) |
+| `station_devices` | 005 | One kiosk tablet per station, signing in with an API key stored as a hash (the key is shown once, when it is created). The `X-Device-Key` header is checked against it; a device acts only on its own station. | none (raw SQL only) |
 | `station_sources` | 003 | Every outside record (OSM, OCM, manual) a station was built from, so re-running an import updates instead of duplicating. | none (raw SQL only) |
 | `stations` | 003 | Charging stations. The app shows only `FOUR_WHEELER` stations; two-wheeler ones are kept hidden. `estimated_fields` lists generated values. | `backend/app/features/stations/models.py` |
 | `users` | 002 | Accounts from Google sign-in or email registration. Columns and ids match the old database so existing logins keep working. | `backend/app/features/auth/models.py` |
@@ -31,6 +32,8 @@ Tables without a model are read or written with plain SQL or by the database its
 
 ```mermaid
 erDiagram
+    station_devices ||--o{ admin_alerts : "device_id"
+    stations ||--o{ admin_alerts : "station_id"
     bookings ||--o{ booking_events : "booking_id"
     chargers ||--o{ bookings : "charger_id"
     chargers ||--o{ bookings : "moved_from_charger_id"
@@ -59,6 +62,38 @@ erDiagram
 The allowed values are mirrored in `frontend/shared/src/constants.ts` (`CONNECTOR_TYPES`, `DATA_SOURCES`, statuses) and in the API's `ConnectorType` literal; change all of them together.
 
 ## Tables
+
+### `admin_alerts`
+
+Flags the system raises for the admin page (kiosk code guessing today). Phase 7 shows them. (migration 014; row-level security: on)
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `alert_id` | `uuid` | no | `gen_random_uuid()` |
+| `kind` | `text` | no |  |
+| `station_id` | `uuid` | yes |  |
+| `device_id` | `uuid` | yes |  |
+| `message` | `text` | no |  |
+| `details` | `jsonb` | no | `'{}'::jsonb` |
+| `created_at` | `timestamp with time zone` | no | `now()` |
+| `resolved_at` | `timestamp with time zone` | yes |  |
+
+**Constraints**
+
+- Check `admin_alerts_kind_check`: `CHECK ((kind = 'KIOSK_OTP_GUESSING'::text))`
+- Foreign key `admin_alerts_device_id_fkey`: `FOREIGN KEY (device_id) REFERENCES station_devices(device_id) ON DELETE SET NULL`
+- Foreign key `admin_alerts_station_id_fkey`: `FOREIGN KEY (station_id) REFERENCES stations(station_id) ON DELETE CASCADE`
+- n `admin_alerts_alert_id_not_null`: `NOT NULL alert_id`
+- n `admin_alerts_created_at_not_null`: `NOT NULL created_at`
+- n `admin_alerts_details_not_null`: `NOT NULL details`
+- n `admin_alerts_kind_not_null`: `NOT NULL kind`
+- n `admin_alerts_message_not_null`: `NOT NULL message`
+- Primary key `admin_alerts_pkey`: `PRIMARY KEY (alert_id)`
+
+**Indexes**
+
+- `admin_alerts_device`: `btree (device_id, kind, created_at DESC)`
+- `admin_alerts_open`: `btree (created_at DESC) WHERE (resolved_at IS NULL)`
 
 ### `allowed_booking_transitions`
 
@@ -359,7 +394,7 @@ Companies that run stations (Tata Power, Jio-bp...). Spelling variants are merge
 
 ### `otp_attempts`
 
-Every code typed at a kiosk, for the wrong-guess cooldown. Not used by any code yet. (migration 005; row-level security: on)
+Every code typed at a kiosk, right or wrong: 5 wrong in a row means a 2-minute wait, 20 wrong in 10 minutes raises an admin alert. (migration 005; row-level security: on)
 
 | Column | Type | Null? | Default |
 |---|---|---|---|
@@ -383,7 +418,7 @@ Every code typed at a kiosk, for the wrong-guess cooldown. Not used by any code 
 
 ### `payments`
 
-Razorpay payments: the booking fee today; energy bills and walk-in prepayments are designed for but not built. (migration 007; row-level security: on)
+Razorpay payments: the booking fee, the energy bill (`ENERGY`) and a walk-in's prepayment (`WALKIN_PREPAID`, a payment link). Refunds are recorded here, not sent. (migration 007; row-level security: on)
 
 | Column | Type | Null? | Default |
 |---|---|---|---|
@@ -450,7 +485,7 @@ Which migration files have been applied. Created by `database/migrate.py`, not b
 
 ### `station_devices`
 
-One kiosk tablet per station, signing in with an API key stored as a hash. Rows exist (demo kiosks) but no API uses them yet. (migration 005; row-level security: on)
+One kiosk tablet per station, signing in with an API key stored as a hash (the key is shown once, when it is created). The `X-Device-Key` header is checked against it; a device acts only on its own station. (migration 005; row-level security: on)
 
 | Column | Type | Null? | Default |
 |---|---|---|---|
@@ -660,11 +695,11 @@ All in `public`. Jobs and event functions take `p_now timestamptz DEFAULT now()`
 |---|---|---|
 | `apply_charger_event(p_charger uuid, p_event text, p_details jsonb, p_source text, p_now timestamp with time zone)` | `text` | The only way a charger's status changes; logs to `charger_events`; returns the new status or `REJECTED`. (011) |
 | `apply_reservation_locks(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: reserves chargers 15 minutes before a booking, releases them afterwards, sets/clears driver warnings. (011) |
-| `auto_stop_sessions(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: stops sessions at slot end (walk-ins: before the next booking or when prepaid runs out) and bills them. (011) |
+| `auto_stop_sessions(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: stops sessions at slot end (walk-ins: before the next booking, at the end of their window, or when prepaid runs out) and bills them. (011, replaced in 014) |
 | `charger_is_locked(p_charger uuid, p_now timestamp with time zone)` | `boolean` | True while a confirmed booking reserves the charger (from 15 minutes before start until it ends). (011) |
 | `enforce_booking_transition()` | `trigger` | Trigger function: rejects illegal booking status changes and logs the legal ones to `booking_events`. (004) |
 | `expire_holds(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: unpaid holds past their time become EXPIRED. (011) |
-| `finish_session(p_session uuid, p_ended_at timestamp with time zone, p_reason text, p_actor text, p_now timestamp with time zone)` | `charging_sessions` | Ends a session: energy, bill, booking COMPLETED, charger freed. Safe to call twice. (011) |
+| `finish_session(p_session uuid, p_ended_at timestamp with time zone, p_reason text, p_actor text, p_now timestamp with time zone)` | `charging_sessions` | Ends a session: energy, bill, booking COMPLETED, charger freed. A walk-in is billed at most what it prepaid and the leftover is recorded as a refund. Safe to call twice. (011, replaced in 014) |
 | `haversine_km(lat1 double precision, lng1 double precision, lat2 double precision, lng2 double precision)` | `double precision` | Distance in km between two coordinates (used by station search). (003) |
 | `job_rule(p_name text)` | `numeric` | Reads one value from `job_rules`. (011) |
 | `mark_no_shows(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: unclaimed bookings become NO_SHOW 10 minutes after the start (fee kept). (011) |

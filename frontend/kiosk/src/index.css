@@ -1,0 +1,68 @@
+@import "tailwindcss";
+@import "../../shared/src/styles/tokens.css";
+
+/* The kiosk is read from about a metre away on a landscape tablet. Everything in the design tokens is in rem,
+   so one number scales the whole screen: 1rem = 20 px (base text 20 px, headings 40 px and up,
+   buttons 4rem = 80 px tall, well over the 64 px minimum for touch). */
+@layer base {
+  html {
+    font-size: 20px;
+  }
+
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    min-height: 100dvh;
+    overflow: hidden;
+    /* A shared screen: no text selection, no pinch zoom, no pull-to-refresh, no grey flash on touch. */
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* The board's "attract" loop after 2 minutes without a touch: the two actions take turns glowing. */
+@keyframes attract-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  }
+}
+
+.attract-glow {
+  animation: attract-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.screen-in {
+  animation: fade-in var(--duration-base) var(--ease-out) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attract-glow,
+  .screen-in {
+    animation: none;
+  }
+}

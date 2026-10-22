@@ -130,6 +130,7 @@ class BookingRules:
     kiosk_alert_threshold: int = 20
     kiosk_alert_window_minutes: int = 10
     kiosk_idle_reset_seconds: int = 30
+    kiosk_done_tile_seconds: int = 120  # how long a finished walk-in stays on the status board ("Done - used ...")
     recommendation_radius_km: float = 15.0
     duplicate_station_distance_m: float = 50.0
     display_timezone: str = "Asia/Kolkata"

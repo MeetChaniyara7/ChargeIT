@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Receipt } from 'lucide-react';
 import { formatTimeIST } from '@chargespot/shared';
-import { Button, buttonClasses, Card, Money } from '../../components/ui';
+import { buttonClasses, Card, Money } from '../../components/ui';
+import { PayBillButton } from './PayBillButton';
 import { END_REASONS } from './types';
 import type { LiveSession } from './types';
 
 /** The card shown once charging has ended: what was used and what it comes to. */
-export const SessionSummary: React.FC<{ session: LiveSession }> = ({ session }) => {
+export const SessionSummary: React.FC<{ session: LiveSession; onPaid?: () => void }> = ({ session, onPaid }) => {
   const total = session.bill_amount ?? session.cost_so_far;
   const due = session.bill_status === 'DUE';
   return (
@@ -38,14 +39,21 @@ export const SessionSummary: React.FC<{ session: LiveSession }> = ({ session }) 
 
       {due ? (
         <div className="space-y-2">
-          {/* Paying the energy bill arrives in the next update; the amount is already recorded. */}
-          <Button size="lg" fullWidth disabled>
-            Pay <Money value={total} />
-          </Button>
-          <p className="text-center text-xs text-muted">Paying this bill opens in the next update. Until it is paid you cannot book a new slot.</p>
+          <PayBillButton sessionId={session.session_id} amount={total} onPaid={() => onPaid?.()} />
+          <p className="text-center text-xs text-muted">Until this bill is paid you cannot book a new slot.</p>
         </div>
       ) : (
-        <p className="text-center text-sm text-muted">{session.bill_status === 'PAID' ? 'Nothing to pay for this session.' : 'This session needs no payment.'}</p>
+        <div className="space-y-3">
+          <p className="text-center text-sm text-muted">
+            {session.bill_status === 'PAID' ? 'Paid. Thank you!' : session.bill_status === 'PREPAID_SETTLED' ? 'Paid in advance at the kiosk.' : 'This session needs no payment.'}
+          </p>
+          {session.source !== 'WALK_IN' && session.bill_status === 'PAID' && (
+            <Link to={`/receipts/session/${session.session_id}`} className={buttonClasses({ variant: 'secondary', size: 'lg', fullWidth: true })}>
+              <Receipt className="size-4" aria-hidden="true" />
+              View receipt
+            </Link>
+          )}
+        </div>
       )}
 
       <Link to="/bookings" className={buttonClasses({ variant: 'secondary', size: 'lg', fullWidth: true })}>

@@ -4,12 +4,12 @@
 
 ## Project
 
-ChargeSpot is "BookMyShow for EV charging", a college final-year project built only with free tools. Drivers find stations in Gujarat, hold a 30-minute slot, pay a ₹199 booking fee (Razorpay test mode), get a one-time code, and watch charging live. Status: phases 0 to 4 are on `main`; phase 5 (jobs, simulator, realtime, live charging) is built on branch `phase-5-jobs-realtime`; the kiosk, energy-bill payment, admin area and deployment (phases 6 and 7) are not started. Details: `docs/SPEC.md`, `docs/PLAN.md`.
+ChargeSpot is "BookMyShow for EV charging", a college final-year project built only with free tools. Drivers find stations in Gujarat, hold a 30-minute slot, pay a ₹199 booking fee (Razorpay test mode), get a one-time code, and watch charging live. Status: phases 0 to 4 are on `main`; phase 5 (jobs, simulator, realtime, live charging) is on `main`; phase 6 (kiosk, energy-bill payment, receipts) is built on branch `phase-6-kiosk`, waiting for review; the admin area and deployment (phase 7) are not started. Details: `docs/SPEC.md`, `docs/PLAN.md`.
 
 ## Tech stack
 
 - **API:** Python 3.12, FastAPI, SQLAlchemy 2, psycopg 3, Pydantic, PyJWT, bcrypt, httpx, razorpay SDK.
-- **Web app:** React 19, Vite 8, TypeScript, Tailwind CSS v4, React Router 7, Leaflet, `@supabase/supabase-js` (Realtime only).
+- **Web app and kiosk:** React 19, Vite 8, TypeScript, Tailwind CSS v4, React Router 7, Leaflet, `@supabase/supabase-js` (Realtime, web app only), `qrcode.react` (kiosk).
 - **Database:** PostgreSQL on Supabase (`btree_gist`, `pg_trgm`, `pg_cron`); numbered SQL migrations.
 - **Outside services (free):** Google Sign-In, Razorpay (test mode), OSRM, Nominatim, OpenStreetMap tiles, Supabase Realtime.
 - **Tooling:** npm workspaces, oxlint, pytest, Node's built-in test runner (no vitest).
@@ -22,9 +22,9 @@ backend/scripts/        demo tools: simulate.py, make_admin.py
 backend/tests/          pytest (needs_db tests use TEST_DATABASE_URL)
 frontend/user-web/      driver web app: src/app, src/components/{layout,ui}, src/features/<name>, src/lib, tests/
 frontend/shared/        @chargespot/shared: constants, formatters, parseSearch, estimateEnergy, tokens.css, api-types.ts (generated)
-frontend/kiosk/         NOT BUILT (phase 6)
+frontend/kiosk/         station kiosk tablet app: src/{app,screens,components,lib}, tests/ (phase 6)
 database/               migrations/ (schema), seeds/, imports/, queries/ (saved SQL), tests/, migrate.py, pipeline.py
-docs/                   architecture.md (design + section 18: what is built today), FLOW.md, SCHEMA.md, API.md, SPEC.md, PLAN.md, DECISIONS.md, CHANGELOG.md, phases.md, setup.md, data.md, ui-flow.md, ui-prompts.md
+docs/                   architecture.md (design + section 18: what is built today), FLOW.md, kiosk.md, SCHEMA.md, API.md, SPEC.md, PLAN.md, DECISIONS.md, CHANGELOG.md, phases.md, setup.md, data.md, ui-flow.md, ui-prompts.md
 data/                   raw downloads and old exports (git-ignored)
 ```
 
@@ -46,6 +46,7 @@ Run (two terminals):
 ```bash
 uvicorn app.main:app --reload --port 8000     # in backend, venv active; docs at http://localhost:8000/docs
 npm run dev:web                               # in the repo root; http://localhost:5173
+npm run dev:kiosk                             # the station kiosk; http://localhost:5174 (list it in CORS_ORIGINS)
 ```
 
 Build, lint, test:
@@ -80,6 +81,7 @@ python -m scripts.simulate event FAULT "Riya Autolink Sola" CCS2-1            # 
 python -m scripts.simulate start <booking-id>                   # start charging, like the kiosk will
 python -m scripts.simulate jobs                                 # run all background jobs once, now
 python -m scripts.make_admin you@example.com                    # make an account admin (--remove to undo)
+python -m scripts.make_kiosk_key "Riya Autolink" --name "Entrance kiosk"   # a kiosk key for a station (shown once)
 ```
 
 ## Conventions seen in the code
@@ -88,6 +90,7 @@ python -m scripts.make_admin you@example.com                    # make an accoun
 - **Pure modules** (`scoring.py`, `refunds.py`, `energy.py`, `slots.py`, `selection.ts`, `parseSearch`) have no database or network access and their own unit tests.
 - **Rules that must always hold live in the database:** `bookings_no_double_booking` (catch SQLSTATE `23P01`; retry once on `40P01`), `allowed_booking_transitions` + trigger (tell it who and why with `state_machine.set_actor()`), and the SQL job functions in `011_jobs.sql`. Lazy checks (`features/jobs/lazy.py`) re-run them before reads.
 - **Tests:** pytest with a rolled-back transaction per test (`db` / `db_client` fixtures, `tests/factories.py`); the SQL job tests call functions with a chosen `p_now`.
+- **Kiosk:** shared and unattended, so it shows no names, phone numbers or bills; every call carries `X-Device-Key` and the API limits it to its own station; times follow the server clock; no hover-only behaviour; the root font is 20 px; polls the API (no Supabase key on the tablet). Pure logic (`lib/otp.ts`, `tiles.ts`, `format.ts`) has unit tests.
 - **Web app:** function components (`React.FC`), data through `useApiQuery(key, fetcher)` and `apiFetch` (`src/lib`), filters in the URL, hooks in their own files (fast-refresh lint), accessibility built in (labels, roles, 44 px targets, reduced-motion respected).
 - **Comments** explain why, in plain language; each module starts with a short docstring.
 
@@ -110,5 +113,6 @@ python -m scripts.make_admin you@example.com                    # make an accoun
 ## Environment
 
 - `backend/.env` (see `backend/.env.example`, every variable documented). Required: `DATABASE_URL`, `JWT_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `FRONTEND_URL`. The API refuses to start without them. For bookings and payments: `OTP_SECRET`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (an endpoint that needs a missing one answers 503). Tests/tooling: `TEST_DATABASE_URL`, `OCM_API_KEY`, `IMPORT_REGION`, `LEGACY_DATABASE_URL`, `DEMO_PASSWORD`.
+- `frontend/kiosk/.env`: `VITE_API_URL` only (the kiosk key is pasted on the tablet).
 - `frontend/user-web/.env`: `VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID` (must equal the API's `GOOGLE_CLIENT_ID`), `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (must belong to the **same** Supabase project as the database, or live updates fall back to polling).
 - Setup in detail: `docs/setup.md`.

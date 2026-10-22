@@ -359,7 +359,7 @@ def test_outside_sessions_are_never_stopped_or_billed_by_the_job(db):
 def test_walk_in_sessions_stop_before_the_next_booking_and_when_the_prepaid_amount_is_used(db):
     _, [a, b] = make_station(db, ("A", "CCS2", 60, 20), ("B", "CCS2", 60, 20))
     make_booking(db, a, START + 70 * M)
-    early = start_session(db, make_walk_in(db, a, START, 60), a, START, source="WALK_IN")
+    early = start_session(db, make_walk_in(db, a, START, 65), a, START, source="WALK_IN")  # a real walk-in window ends 5 minutes before the next booking
     assert one(db, "SELECT auto_stop_sessions(%s)", START + 64 * M) == 0
     assert one(db, "SELECT auto_stop_sessions(%s)", START + 65 * M) == 1  # five minutes before the next booking at +70
     ended, reason, status = db.execute("SELECT ended_at, end_reason, bill_status FROM charging_sessions WHERE session_id = %s", (early,)).fetchone()

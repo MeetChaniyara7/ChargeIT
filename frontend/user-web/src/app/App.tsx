@@ -12,6 +12,7 @@ import { HoldPage } from '../features/bookings/HoldPage';
 import { ReceiptPage } from '../features/bookings/ReceiptPage';
 import { TicketPage } from '../features/bookings/TicketPage';
 import { ChargingPage } from '../features/charging/ChargingPage';
+import { SessionReceiptPage } from '../features/charging/SessionReceiptPage';
 import { LiveChargingPage } from '../features/charging/LiveChargingPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { VehiclesPage } from '../features/profile/VehiclesPage';
@@ -59,6 +60,7 @@ export const App: React.FC = () => {
               <Route path="/book/:bookingId" element={<HoldPage />} />
               <Route path="/tickets/:bookingId" element={<TicketPage />} />
               <Route path="/receipts/:bookingId" element={<ReceiptPage />} />
+              <Route path="/receipts/session/:sessionId" element={<SessionReceiptPage />} />
               <Route path="/charging" element={<ChargingPage />} />
               <Route path="/charging/:sessionId" element={<LiveChargingPage />} />
               <Route path="/profile" element={<ProfilePage />} />

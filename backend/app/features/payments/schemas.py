@@ -44,3 +44,14 @@ class VerifyOut(BaseModel):
 
 class WebhookAck(BaseModel):
     status: str  # processed | duplicate | ignored
+
+
+class EnergyOrderOut(BaseModel):
+    """Razorpay Checkout details for paying a finished session's energy bill (the amount is the server's bill)."""
+
+    session_id: UUID
+    order_id: str
+    amount: float
+    amount_paise: int
+    currency: str
+    key_id: str

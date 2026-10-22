@@ -263,3 +263,22 @@
     animation: none;
   }
 }
+
+/* Printing (the receipt's "Print / save as PDF"): paper is white with black text, and only the receipt card is left.
+   Canvas and CanvasText are the browser's own page colours, so no palette colour is used here. */
+@media print {
+  body {
+    background: Canvas;
+    color: CanvasText;
+  }
+  .receipt {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+  .receipt * {
+    color: inherit !important;
+    border-color: CanvasText !important;
+  }
+}

@@ -10,9 +10,11 @@ export const DuesBanner: React.FC<{ dues: DuesOut }> = ({ dues }) => (
     <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
     <div>
       <p className="font-bold">
-        You have {dues.count === 1 ? 'an unpaid bill' : `${dues.count} unpaid bills`} of <Money value={dues.total} />
+        Clear <Money value={dues.total} /> to book again
       </p>
-      <p className="mt-0.5 text-muted">Pay {dues.count === 1 ? 'it' : 'them'} before booking again.</p>
+      <p className="mt-0.5 text-muted">
+        You have {dues.count === 1 ? 'an unpaid charging bill' : `${dues.count} unpaid charging bills`}.
+      </p>
       <Link to="/bookings?tab=due" className="mt-2 inline-flex min-h-11 items-center font-bold text-info underline-offset-2 hover:underline">
         Go to Payment due
       </Link>

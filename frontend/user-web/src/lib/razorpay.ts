@@ -29,6 +29,12 @@ declare global {
   }
 }
 
+/** The primary colour for Razorpay's window. Read from the design tokens so the two stay in step. */
+export function primaryColour(): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim();
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : '#22c55e';
+}
+
 let loading: Promise<void> | null = null;
 
 /** Loads the Checkout script once. A failed load can be tried again. */

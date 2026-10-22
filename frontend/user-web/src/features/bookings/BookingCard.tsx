@@ -87,6 +87,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onCancel, onN
             Cancel
           </Button>
         )}
+        {!live && booking.session_id && (
+          <Link to={`/receipts/session/${booking.session_id}`} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
+            <BatteryCharging className="size-4" aria-hidden="true" />
+            Charging bill
+          </Link>
+        )}
         {!live && booking.fee_paid && (
           <Link to={`/receipts/${booking.booking_id}`} className={buttonClasses({ size: 'sm', variant: 'secondary' })}>
             <Receipt className="size-4" aria-hidden="true" />

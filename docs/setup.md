@@ -256,3 +256,12 @@ This uses `npx openapi-typescript`, so nothing extra needs installing.
 | `password authentication failed` connecting to Supabase | The `[ ]` around the password are still in `DATABASE_URL`, the password is wrong, or it has unencoded special characters |
 | `ModuleNotFoundError: No module named 'database'` | Run database commands from the **repository root**, not from `database/` |
 | `npm run generate:api-types` produces old types | Another API is already running on port 8000; stop it, start the current one, and run again |
+
+
+## The station kiosk (Phase 6)
+
+1. Copy `frontend/kiosk/.env.example` to `frontend/kiosk/.env` (it only needs `VITE_API_URL`).
+2. Add the kiosk address to `CORS_ORIGINS` in `backend/.env`, for example `http://localhost:5173,http://localhost:5174`, and restart the API.
+3. Make a key: from `backend` with the venv active, `python -m scripts.make_kiosk_key "<station name>"`. Copy it: it is shown once.
+4. Run `npm run dev:kiosk` from the repo root and open http://localhost:5174. Paste the key on the setup screen.
+5. Tablet setup (full screen, keep awake) and the manual test script are in `docs/kiosk.md`.

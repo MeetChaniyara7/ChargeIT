@@ -165,7 +165,7 @@ export const LiveChargingPage: React.FC = () => {
           </p>
         </>
       ) : (
-        <SessionSummary session={session} />
+        <SessionSummary session={session} onPaid={query.refresh} />
       )}
 
       <Sheet

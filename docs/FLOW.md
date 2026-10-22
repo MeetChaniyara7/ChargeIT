@@ -2,7 +2,7 @@
 
 Step-by-step sequences with the real files and functions involved. Paths are from the repository root. The API is in `backend/app/`, the web app in `frontend/user-web/src/`, shared code in `frontend/shared/src/`, SQL in `database/migrations/`.
 
-Contents: [1 Startup](#1-startup) · [2 A request, end to end](#2-a-request-end-to-end) · [3 Sign in](#3-sign-in) · [4 Finding stations](#4-finding-stations-explore-and-search) · [5 Station page and availability](#5-station-page-and-availability) · [6 Booking and paying](#6-booking-and-paying) · [7 After booking](#7-after-booking-codes-cancel-charge-now) · [8 Background jobs](#8-background-jobs-and-lazy-checks) · [9 Charging sessions](#9-charging-sessions-and-the-simulator) · [10 Live updates](#10-live-updates-realtime) · [11 Building the database](#11-building-the-database)
+Contents: [1 Startup](#1-startup) · [2 A request, end to end](#2-a-request-end-to-end) · [3 Sign in](#3-sign-in) · [4 Finding stations](#4-finding-stations-explore-and-search) · [5 Station page and availability](#5-station-page-and-availability) · [6 Booking and paying](#6-booking-and-paying) · [7 After booking](#7-after-booking-codes-cancel-charge-now) · [8 Background jobs](#8-background-jobs-and-lazy-checks) · [9 Charging sessions](#9-charging-sessions-and-the-simulator) · [10 Live updates](#10-live-updates-realtime) · [11 Building the database](#11-building-the-database) · [12 The station kiosk](#12-the-station-kiosk) · [13 Paying the energy bill and receipts](#13-paying-the-energy-bill-and-receipts)
 
 Related: system picture in `docs/architecture.md` (section 18), tables in `docs/SCHEMA.md`, endpoints in `docs/API.md`.
 
@@ -130,7 +130,7 @@ TicketPage ◀── navigate with the code in router state (shown once) ◀─�
 5. The code is returned **once** in `VerifyOut.otp`. `HoldPage` navigates to `/tickets/:bookingId` with the code in router state (`TicketState`); `TicketPage.tsx` copies it into memory and clears the history state, so a refresh does not show it again.
 6. When the countdown reaches zero `HoldPage` asks the server again; the server's lazy expiry decides. "Release this slot" calls `POST /api/bookings/{id}/cancel`.
 
-**6.4 Webhook (backup path).** `POST /api/payments/webhook` → `features/payments/router.py` `webhook()` reads the raw body → `service.handle_webhook()`: `verify_webhook_signature()` (`RAZORPAY_WEBHOOK_SECRET`), insert the event id into `webhook_events` (`ON CONFLICT DO NOTHING`; a repeat returns `duplicate`), and for `payment.captured` / `order.paid` call `confirm_payment()`. **The webhook URL is not registered in Razorpay yet** (it needs a public URL; planned for deployment), so today `/verify` is the only confirmation path.
+**6.4 Webhook (backup path).** `POST /api/payments/webhook` → `features/payments/router.py` `webhook()` reads the raw body → `service.handle_webhook()`: `verify_webhook_signature()` (`RAZORPAY_WEBHOOK_SECRET`), insert the event id into `webhook_events` (`ON CONFLICT DO NOTHING`; a repeat returns `duplicate`), and for `payment.captured` / `order.paid` call `confirm_payment()` (which also settles an energy bill, section 13). The event `payment_link.paid` is a walk-in's payment (section 12.5). **The webhook URL is not registered in Razorpay yet** (it needs a public URL; planned for deployment), so today `/verify` is the only confirmation path for the app, and the kiosk's own poll is the only one for walk-ins.
 
 ---
 
@@ -154,7 +154,7 @@ Rules that must happen by themselves are SQL functions in `database/migrations/0
 1. `expire_holds()`: `HELD` with `hold_expires_at <= p_now` → `EXPIRED`.
 2. `resolve_occupied_starts()`: a `CONFIRMED`, unclaimed booking whose slot has started and whose charger is faulted or running an outside session → move to a free charger with the same plug at the station (closest power), else cancel with a full refund of what was paid; sets `notice_kind` / `notice_text` on the booking.
 3. `mark_no_shows()`: `CONFIRMED` and no code used 10 minutes after the start → `NO_SHOW` (fee kept).
-4. `auto_stop_sessions()`: ends booking sessions at slot end (walk-in sessions: 5 minutes before the next booking or when the prepaid amount is used up) through `finish_session()`.
+4. `auto_stop_sessions()`: ends booking sessions at slot end (walk-in sessions: 5 minutes before the next booking, at the end of their window, or when the prepaid amount is used up) through `finish_session()`. Replaced in migration 014 to add the walk-in window end.
 5. `apply_reservation_locks()`: chargers with a confirmed booking within 15 minutes become `RESERVED` (`apply_charger_event`), released when no longer needed; warns drivers when an outside session still occupies the charger.
 
 Two callers:
@@ -165,14 +165,14 @@ Two callers:
 
 ## 9. Charging sessions and the simulator
 
-There is no kiosk yet, so charging is started by the admin demo tools (`backend/scripts/simulate.py`, or `POST /api/admin/bookings/{id}/start`).
+Charging is started by the kiosk (section 12), or by the admin demo tools (`backend/scripts/simulate.py`, or `POST /api/admin/bookings/{id}/start`), which call the same `start_session()`.
 
 1. **Start:** `features/charging/service.py` `start_session()`: booking must be `CONFIRMED`, charger `AVAILABLE` or `RESERVED`; `state_machine.transition(... "ACTIVE")`, marks the code used, inserts a `ChargingSession` (`start_soc_percent` = 20 by default), and runs `apply_charger_event(..., 'SESSION_START')` in SQL (charger → `CHARGING`, logged in `charger_events`).
 2. **Live numbers:** `GET /api/me/sessions/{id}` → `get_session()` → `_load_fresh()` (lazy jobs) → `to_live()`: `energy.energy_kwh()` (power x hours x 0.9, capped by the vehicle's battery x remaining room; same formula as the SQL `session_energy_kwh`), `battery_percent()`, `bill_amount()`, `seconds_left`, `stop_warning` (last 5 minutes), `next_booking_waiting`.
 3. **Web page:** `LiveChargingPage.tsx` uses `useLiveSession()` (refresh on a realtime nudge plus every 15 s), `useAnimatedNumber()` to glide values, `useSecondsLeft()` for the countdown, `BatteryRing.tsx`, `SessionSummary.tsx` once ended. `ActiveSessionProvider.tsx` (in `AppLayout`) polls `GET /api/me/sessions/active` for the app-bar pill and the Charging tab dot.
-4. **Stop:** user: `POST /api/me/sessions/{id}/stop` → `stop_session()` → SQL `finish_session(..., 'USER_STOP', 'USER')`. Automatic: step 4 of section 8. `finish_session()` works out energy and bill, sets `bill_status` (`DUE` for app/instant sessions, `PAID` if the bill is 0), completes the booking and frees the charger.
+4. **Stop:** user: `POST /api/me/sessions/{id}/stop` → `stop_session()` → SQL `finish_session(..., 'USER_STOP', 'USER')`. Automatic: step 4 of section 8. `finish_session()` works out energy and bill, sets `bill_status` (`DUE` for app/instant sessions, `PAID` if the bill is 0), completes the booking and frees the charger. For a walk-in session it bills at most the prepaid amount and records the leftover as a refund (section 12.7).
 5. **Outside sessions and faults:** `POST /api/admin/chargers/{id}/simulate` → `features/chargers/service.py` `simulate()` → SQL `simulate_charger_event()`: `EXTERNAL_START` (refused while the charger is reserved), `EXTERNAL_STOP`, `UNPLUG`, `FAULT`, `RECOVER`. A charger's status changes only through `apply_charger_event()`; every event, including refusals, is a row in `charger_events`.
-6. **Paying the bill is not built** (the summary's Pay button is disabled; see `docs/PLAN.md`).
+6. **Paying the bill** is section 13.
 
 ---
 
@@ -196,3 +196,45 @@ There is no kiosk yet, so charging is started by the admin demo tools (`backend/
 6. `demo_data.run()` creates demo accounts (`@chargespot.test`), a week of demo bookings and kiosk devices.
 
 Tests build a fresh schema each run from the same migrations (`backend/tests/conftest.py`, `database/tests/conftest.py`) in `TEST_DATABASE_URL`, a throwaway local database.
+
+---
+
+## 12. The station kiosk
+
+Files: `frontend/kiosk/src/` (the app), `backend/app/features/kiosk/` (the API). Staff instructions and the manual test script: `docs/kiosk.md`.
+
+**12.1 The device key.** `python -m scripts.make_kiosk_key` (or `POST /api/admin/stations/{id}/devices`) → `kiosk/admin_router.py` `create_device()` → `keys.generate()` makes `ks_<prefix>_<secret>`; `station_devices` keeps only the prefix and the SHA-256 of the key. The setup screen (`screens/SetupScreen.tsx`) calls `GET /api/kiosk/status` with the pasted key and saves it in `localStorage` (`lib/api.ts` `keyStorage`) only if the server accepts it. Every kiosk route depends on `kiosk/dependencies.py` `get_current_device()`: find the row by prefix, compare the hash in constant time (`401 INVALID_DEVICE_KEY`, `403 DEVICE_DISABLED`), update `last_seen_at` at most every 30 seconds. From there every query is limited to `device.station_id`: another station's charger or walk-in looks like one that does not exist (404).
+
+**12.2 The board.** `app/App.tsx` → `lib/useKioskStatus.ts` asks `GET /api/kiosk/status` every 4 seconds → `kiosk/service.py` `status()`: `run_due_jobs()` for the station, then the station's chargers, its live bookings (`occupies_charger`), its running sessions and the walk-ins that ended in the last 2 minutes. `_tile()` chooses the state (`OUT_OF_SERVICE`, `CHARGING`, `PAYING`, `RESERVED`, `FREE`), "free until" (next booking minus 5 minutes), progress (the same `energy.py` formula), the walk-in money used, and for a free charger the walk-in options (`build_options()`). `lib/tiles.ts` turns a tile into words. Nothing in the answer names a person or shows an app user's bill. Two failed polls in a row show `ConnectionOverlay`; the board keeps the last answer. Times follow the server's clock (`useServerNow()` with the offset from `server_time`).
+
+**12.3 Start with a code.** `screens/OtpScreen.tsx` (rules in `lib/otp.ts`) → `POST /api/kiosk/otp-start {otp}` → `kiosk/service.py` `otp_start()`:
+1. `cooldown_left()`: wrong tries since the last right one; if that count is a multiple of 5 and the latest was under 2 minutes ago → `429 OTP_COOLDOWN` with `retry_after_seconds`.
+2. Lazy jobs, then the candidates: `CONFIRMED` bookings of this station with an unused code, compared with `otp.matches()` (HMAC, constant time).
+3. No match, or `otp.is_valid_now()` false: an `otp_attempts` row (`success = false`), `_raise_alert_if_needed()` (20 wrong in 10 minutes → one `admin_alerts` row per 10 minutes), then `400 WRONG_OTP {tries_left}`, `409 OTP_NOT_VALID_NOW`, or the cooldown if that was the 5th.
+4. Match: `charging/service.py` `start_session(..., actor="DEVICE", device_id=...)` (the Phase 5 function: booking `CONFIRMED` → `ACTIVE`, session, charger `CHARGING`), then a success row (which resets the streak). A charger that cannot start (`CHARGER_UNAVAILABLE`) also records a success: the code was right.
+The response (charger label and plug) goes to `screens/StartedScreen.tsx` ("Go to Charger X and plug in", back to the board after 8 seconds).
+
+**12.4 Walk-in: ask for a charger.** `screens/WalkInFlow.tsx` (pick, amount) → `POST /api/kiosk/walk-ins {charger_id, amount | until_next}` → `kiosk/walkin.py` `create()`:
+1. The amount must be one of ₹100 / ₹200 / ₹500, or `until_next`. The charger row is locked and must belong to the device's station, be usable, and have a known price and power (`PRICE_UNKNOWN`).
+2. In a retry loop: `expire_stale_holds()`, refuse if a live booking covers now (`CHARGER_BUSY`), find the next booking, `instant_window()` (earlier of 2 hours and next booking minus 5 minutes, at least 15 minutes, else `NO_ROOM_FOR_WALK_IN`), price `until_next` with `until_next_amount()`.
+3. Insert a `WALK_IN` booking: no user, `HELD`, `hold_expires_at = now + 3 minutes`, actor `DEVICE`. The same exclusion constraint as every booking decides overlaps (`23P01` → `CHARGER_BUSY`); while it is `HELD` nobody can book that charger.
+4. Commit, then `gateway.create_payment_link()` (`RazorpayGateway`: amount x 100 paise, `reference_id = booking_id`). If Razorpay fails the booking is cancelled at once. A `payments` row (`WALKIN_PREPAID`, `provider_order_id` = the link id) is added. The response carries `payment_url`, `seconds_left` and the amount; `QrStep` draws `QRCodeSVG` and counts down on the device stopwatch.
+
+**12.5 Walk-in: the payment arrives.** Two ways in, one function out (`walkin.confirm_payment()`, safe to run twice):
+- `POST /api/payments/webhook` with `payment_link.paid` → `payments.service.handle_webhook()` (signature, event de-duplication) → `confirm_payment()`.
+- While no webhook is registered, `QrStep` polls `GET /api/kiosk/walk-ins/{id}` every 2 seconds → `walkin.get()` → `_ask_razorpay()` → `gateway.payment_link_status()` (Razorpay's `payment_link.fetch`, at most once every 3 seconds per link). Only Razorpay's own answer "paid" counts.
+`confirm_payment()` locks the booking, marks the payment `CAPTURED` and, if the booking is still `HELD` and the charger is `AVAILABLE`/`RESERVED`: booking `HELD` → `ACTIVE` through `state_machine`, a `ChargingSession` (`source = WALK_IN`, `prepaid_amount`), `payments.session_id`, and `apply_charger_event(... 'SESSION_START')`. Otherwise (the hold expired, "Cancel" was pressed, or the charger broke meanwhile) the payment is refunded in full (recorded). `QrStep` then sees `PAID` and shows "Payment received ✓".
+
+**12.6 Walk-in: it does not get paid.** After 3 minutes `expire_holds` (the job, or the lazy check inside `get()`) makes the booking `EXPIRED` and the charger is free; `EndedStep` says so. "Cancel" calls `POST /api/kiosk/walk-ins/{id}/cancel` → `cancel()` (`HELD` → `CANCELLED`). A payment that still arrives is refunded in full.
+
+**12.7 Walk-in: settlement.** The session ends through `finish_session()` (migration 014): unplugging (`simulate_charger_event`), the admin button, or `auto_stop_sessions()` (5 minutes before the next booking, the end of the walk-in window, or when the energy used costs the prepaid amount). For a walk-in, `finish_session()` caps the bill at the prepaid amount (the job runs once a minute, so the energy is cut back to what the money buys), sets `bill_status = PREPAID_SETTLED`, records the leftover as `payments.refunded_amount` (`PARTIALLY_REFUNDED`, or `REFUNDED` if nothing was used) and `bookings.refund_amount`, completes the booking and frees the charger. The board then shows "Done · used ₹186 · ₹14 refunded" on that tile for 2 minutes (`kiosk_done_tile_seconds`).
+
+---
+
+## 13. Paying the energy bill and receipts
+
+1. After an app or instant session ends, `finish_session()` sets `bill_status = 'DUE'` and the amount (section 9). `SessionSummary.tsx` shows `PayBillButton.tsx`; the Payment due tab of `BookingsPage.tsx` shows one per bill; `DuesBanner.tsx` says "Clear ₹X to book again" while any bill is due.
+2. `useBillPayment()` → `POST /api/me/sessions/{id}/pay` → `payments/service.py` `create_energy_order()`: only the owner, only an ended session with `bill_status = DUE`; an unfinished session is `SESSION_NOT_ENDED`, a paid one `BILL_ALREADY_PAID`. It re-uses a `CREATED` `ENERGY` payment, otherwise `gateway.create_order()` for the server's `bill_amount` and inserts the `Payment` (`purpose = ENERGY`, `session_id`).
+3. `openCheckout()` (the same Checkout as the booking fee), then `POST /api/me/sessions/{id}/pay/verify` → `verify_energy()`: signature check (`400 INVALID_SIGNATURE`), the payment must be an `ENERGY` payment of this session and this user, then `confirm_payment()` → `_confirm_energy()`: payment `CAPTURED`, session `bill_status = PAID`, `paid_at`. If the bill was already paid some other way, the second payment is refunded in full. The response is the updated `LiveSession`, so the page shows "Paid. Thank you!". The webhook events `payment.captured` / `order.paid` reach the same function.
+4. **Receipt:** `/receipts/session/:sessionId` (`features/charging/SessionReceiptPage.tsx`) → `GET /api/me/sessions/{id}/receipt` → `charging/receipt.py` `get_receipt()`: station, charger, start and end times, duration, kWh, rate, total, status (`DUE`, `PAID`, `PREPAID_SETTLED`), Razorpay payment id and the booking fee paid earlier. "Print / save as PDF" calls `window.print()`; the print rules in `index.css` hide the app chrome and leave a black-on-white receipt. (`/receipts/:bookingId` is the older booking-fee receipt.)
+

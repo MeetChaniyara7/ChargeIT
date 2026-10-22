@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AlertCircle, RefreshCw, Ticket, Wallet } from 'lucide-react';
 import { buttonClasses, Button, Card, DateTime, EmptyState, Money, SkeletonBlock, TabPanel, Tabs } from '../../components/ui';
 import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
+import { PayBillButton } from '../charging/PayBillButton';
 import { BookingCard } from './BookingCard';
 import { CancelSheet, NewCodeSheet } from './BookingSheets';
 import type { BookingOut, BookingScope } from './types';
@@ -87,8 +88,7 @@ const BookingList: React.FC<{
   );
 };
 
-const DueList: React.FC = () => {
-  const dues = useDues();
+const DueList: React.FC<{ dues: ReturnType<typeof useDues> }> = ({ dues }) => {
   if (dues.loading) {
     return (
       <div role="status">
@@ -122,12 +122,22 @@ const DueList: React.FC = () => {
       <ul className="space-y-3">
         {data.items.map((item) => (
           <li key={item.session_id}>
-            <Card className="flex items-center justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <p className="truncate text-base font-bold">{item.station_name ?? 'Charging session'}</p>
-                {item.ended_at && <p className="text-sm text-muted"><DateTime value={item.ended_at} /></p>}
+            <Card className="space-y-3 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-bold">{item.station_name ?? 'Charging session'}</p>
+                  {item.ended_at && <p className="text-sm text-muted"><DateTime value={item.ended_at} /></p>}
+                </div>
+                <Money value={item.amount} className="text-xl font-bold" />
               </div>
-              <Money value={item.amount} className="text-xl font-bold" />
+              <div className="flex flex-wrap items-start gap-2">
+                <div className="min-w-40 flex-1">
+                  <PayBillButton sessionId={item.session_id} amount={item.amount} size="md" onPaid={dues.refresh} />
+                </div>
+                <Link to={`/receipts/session/${item.session_id}`} className={buttonClasses({ variant: 'secondary' })}>
+                  Details
+                </Link>
+              </div>
             </Card>
           </li>
         ))}
@@ -167,7 +177,7 @@ export const BookingsPage: React.FC = () => {
         <BookingList scope="past" onCancel={setCancelling} onNewCode={setNewCodeFor} refreshKey={refreshKey} />
       </TabPanel>
       <TabPanel id="due" value={tab}>
-        <DueList />
+        <DueList dues={dues} />
       </TabPanel>
 
       <CancelSheet booking={cancelling} onClose={() => setCancelling(null)} onCancelled={() => setRefreshKey((n) => n + 1)} />
