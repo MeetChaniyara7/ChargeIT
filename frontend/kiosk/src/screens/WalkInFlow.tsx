@@ -28,7 +28,7 @@ interface WalkInFlowProps {
   refreshBoard: () => void;
   onExit: () => void;
   /** The payment arrived and charging has started. */
-  onPaid: (chargerLabel: string, connectorType: string) => void;
+  onPaid: (chargerLabel: string, connectorType: string, stopCode: string | null) => void;
 }
 
 function optionLabel(option: WalkInOption): string {
@@ -78,7 +78,7 @@ export function WalkInFlow({ status, idleSeconds, refreshBoard, onExit, onPaid }
         initial={step.walkIn}
         onPaid={() => {
           refreshBoard();
-          onPaid(step.tile.label, step.tile.connector_type);
+          onPaid(step.tile.label, step.tile.connector_type, step.walkIn.stop_code ?? null);
         }}
         onEnded={(walkIn) => {
           refreshBoard();
@@ -259,12 +259,15 @@ function QrStep({
   };
 
   const urgent = (left ?? 0) <= 30;
+  // The payment link is only in the answer that created the walk-in; the later "has it been paid?" answers do not repeat it.
+  // Keeping the first one is what stops the QR code from disappearing after the first check.
+  const paymentUrl = initial.payment_url ?? null;
   return (
     <div className="flex h-full items-center justify-center gap-14 px-10">
-      <div className="rounded-sheet bg-white p-6" aria-hidden={walkIn.payment_url ? undefined : true}>
-        {walkIn.payment_url ? (
+      <div className="rounded-sheet bg-white p-6" aria-hidden={paymentUrl ? undefined : true}>
+        {paymentUrl ? (
           // A QR code needs black on white to scan reliably, whatever the theme.
-          <QRCodeSVG value={walkIn.payment_url} size={340} level="M" bgColor="#ffffff" fgColor="#000000" title="Payment QR code" />
+          <QRCodeSVG value={paymentUrl} size={340} level="M" bgColor="#ffffff" fgColor="#000000" title="Payment QR code" />
         ) : (
           <div className="size-[340px]" />
         )}

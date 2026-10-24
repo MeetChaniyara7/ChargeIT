@@ -9,6 +9,8 @@ import { BoardScreen } from '../screens/BoardScreen';
 import { OtpScreen } from '../screens/OtpScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { StartedScreen } from '../screens/StartedScreen';
+import { StoppedScreen } from '../screens/StoppedScreen';
+import type { WalkInStopOut } from '../lib/api';
 import { WalkInFlow } from '../screens/WalkInFlow';
 
 /** Used when the server does not say: after this many seconds without a touch a screen goes back to the board. */
@@ -18,7 +20,9 @@ type View =
   | { name: 'board' }
   | { name: 'otp' }
   | { name: 'walkin' }
-  | { name: 'started'; chargerLabel: string; connectorType: string; headline: string }
+  | { name: 'stop' }
+  | { name: 'stopped'; result: WalkInStopOut }
+  | { name: 'started'; chargerLabel: string; connectorType: string; headline: string; stopCode?: string | null }
   | { name: 'setup' };
 
 export const App: React.FC = () => {
@@ -46,6 +50,7 @@ export const App: React.FC = () => {
     return (
       <SetupScreen
         notice={keyRejected ? 'This kiosk key is not valid any more. Ask the station owner for a new one.' : null}
+        currentStation={key !== null && !keyRejected ? board.status?.station_name : null}
         onCancel={key !== null && !keyRejected ? goBoard : undefined}
         onConnected={() => {
           setKey(keyStorage.get());
@@ -72,18 +77,30 @@ export const App: React.FC = () => {
               setView({ name: 'started', chargerLabel: result.charger_label, connectorType: result.connector_type, headline: 'Code accepted' });
             }}
           />
+        ) : view.name === 'stop' ? (
+          <OtpScreen
+            mode="stop"
+            idleSeconds={status.idle_reset_seconds ?? IDLE_RESET_SECONDS}
+            onBack={goBoard}
+            onStopped={(result) => {
+              refresh();
+              setView({ name: 'stopped', result });
+            }}
+          />
+        ) : view.name === 'stopped' ? (
+          <StoppedScreen result={view.result} onDone={goBoard} />
         ) : view.name === 'walkin' ? (
           <WalkInFlow
             status={status}
             idleSeconds={status.idle_reset_seconds ?? IDLE_RESET_SECONDS}
             refreshBoard={refresh}
             onExit={goBoard}
-            onPaid={(chargerLabel, connectorType) => setView({ name: 'started', chargerLabel, connectorType, headline: 'Payment received ✓' })}
+            onPaid={(chargerLabel, connectorType, stopCode) => setView({ name: 'started', chargerLabel, connectorType, headline: 'Payment received ✓', stopCode })}
           />
         ) : view.name === 'started' ? (
-          <StartedScreen chargerLabel={view.chargerLabel} connectorType={view.connectorType} headline={view.headline} onDone={goBoard} />
+          <StartedScreen chargerLabel={view.chargerLabel} connectorType={view.connectorType} headline={view.headline} stopCode={view.stopCode} onDone={goBoard} />
         ) : (
-          <BoardScreen status={status} onOtp={() => setView({ name: 'otp' })} onWalkIn={() => setView({ name: 'walkin' })} />
+          <BoardScreen status={status} onOtp={() => setView({ name: 'otp' })} onWalkIn={() => setView({ name: 'walkin' })} onStop={() => setView({ name: 'stop' })} />
         )}
       </ScreenFrame>
       {board.offline && <ConnectionOverlay />}

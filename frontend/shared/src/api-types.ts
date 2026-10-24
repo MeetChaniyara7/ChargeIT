@@ -280,6 +280,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Popular Operators
+         * @description The brands with the most stations: the "Brand" filter chips on the Explore page.
+         */
+        get: operations["popular_operators_api_search_operators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/vehicles": {
         parameters: {
             query?: never;
@@ -789,6 +809,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/kiosk/walk-ins/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Walk In
+         * @description Stop a walk-in early with the stop code it was given. The energy used is billed; the unused money is recorded as a refund.
+         */
+        post: operations["stop_walk_in_api_kiosk_walk_ins_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/stations/{station_id}/devices": {
         parameters: {
             query?: never;
@@ -830,6 +870,446 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description Today numbers, 30-day revenue and the two chart series.
+         */
+        get: operations["overview_api_admin_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report
+         * @description Bookings by status, no-shows, revenue (booking fees, energy, walk-ins), refunds and operator settlement.
+         */
+        get: operations["report_api_admin_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operators */
+        get: operations["operators_api_admin_operators_get"];
+        put?: never;
+        /** Create Operator */
+        post: operations["create_operator_api_admin_operators_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/operators/{operator_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Operator
+         * @description Only an operator with no stations can be deleted (409 OPERATOR_IN_USE otherwise).
+         */
+        delete: operations["delete_operator_api_admin_operators__operator_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Operator */
+        patch: operations["update_operator_api_admin_operators__operator_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stations */
+        get: operations["stations_api_admin_stations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/stations/{station_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Station */
+        get: operations["get_station_api_admin_stations__station_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Station
+         * @description Edit a station. Taking it off the map while it has future bookings needs `cancel_bookings = true` (409 HAS_FUTURE_BOOKINGS otherwise).
+         */
+        patch: operations["update_station_api_admin_stations__station_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/stations/{station_id}/chargers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Charger */
+        post: operations["create_charger_api_admin_stations__station_id__chargers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/chargers/{charger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Charger
+         * @description Edit a charger. Entering a power or price makes the value real: it loses its Approximate tag.
+         */
+        patch: operations["update_charger_api_admin_chargers__charger_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/chargers/{charger_id}/affected": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Affected By Out Of Service
+         * @description What taking this charger out of service would break: the future bookings, and whether someone is charging.
+         */
+        get: operations["affected_by_out_of_service_api_admin_chargers__charger_id__affected_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/chargers/{charger_id}/out-of-service": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Out Of Service
+         * @description Take a charger out of service. With future bookings it needs `cancel_bookings = true` (409 HAS_FUTURE_BOOKINGS otherwise);
+         *     each is then cancelled with a full refund of what was paid.
+         */
+        post: operations["out_of_service_api_admin_chargers__charger_id__out_of_service_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/chargers/{charger_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore
+         * @description Put an out-of-service charger back in use.
+         */
+        post: operations["restore_api_admin_chargers__charger_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/chargers/{charger_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Charger Events
+         * @description The newest charger events first (the simulator live log).
+         */
+        get: operations["charger_events_api_admin_chargers__charger_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bookings
+         * @description Bookings by slot start (India-time days), newest first.
+         */
+        get: operations["bookings_api_admin_bookings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/bookings/{booking_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Booking Events
+         * @description The booking history: every status change, who made it and why.
+         */
+        get: operations["booking_events_api_admin_bookings__booking_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices */
+        get: operations["devices_api_admin_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alerts */
+        get: operations["alerts_api_admin_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/alerts/{alert_id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Alert Seen */
+        post: operations["alert_seen_api_admin_alerts__alert_id__seen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Users */
+        get: operations["users_api_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change Role
+         * @description Make an account an admin, or an ordinary driver again. You cannot change your own role, and the last admin cannot be removed.
+         */
+        patch: operations["change_role_api_admin_users__user_id__role_patch"];
+        trace?: never;
+    };
+    "/api/admin/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Payments
+         * @description Every payment, newest first, with its refunds and the totals of what matches.
+         */
+        get: operations["payments_api_admin_payments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity
+         * @description What admins changed, newest first.
+         */
+        get: operations["activity_api_admin_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Device */
+        patch: operations["rename_device_api_admin_devices__device_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/devices/{device_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Device
+         * @description A new key for the same tablet and station. The old key stops working at once; the new one is in this answer only.
+         */
+        post: operations["rotate_device_api_admin_devices__device_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -851,6 +1331,156 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityRow */
+        ActivityRow: {
+            /** Action Id */
+            action_id: number;
+            /** Admin Email */
+            admin_email: string;
+            /** Action */
+            action: string;
+            /** Target */
+            target?: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ActivityRows */
+        ActivityRows: {
+            /** Items */
+            items: components["schemas"]["ActivityRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** AdminCharger */
+        AdminCharger: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Label */
+            label: string;
+            /** Connector Type */
+            connector_type: string;
+            /** Current Type */
+            current_type?: string | null;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+            /** Status */
+            status: string;
+            /** Data Source */
+            data_source: string;
+        };
+        /** AdminStation */
+        AdminStation: {
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address: string;
+            /** City */
+            city?: string | null;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Operator Name */
+            operator_name?: string | null;
+            /** Opening Hours */
+            opening_hours?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Data Source */
+            data_source: string;
+            /** Has Estimated Data */
+            has_estimated_data: boolean;
+            /** Chargers */
+            chargers: components["schemas"]["AdminCharger"][];
+        };
+        /** AffectedBooking */
+        AffectedBooking: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** User Email */
+            user_email?: string | null;
+            /** Fee Paid */
+            fee_paid: number;
+        };
+        /** AffectedOut */
+        AffectedOut: {
+            /**
+             * Charger Id
+             * Format: uuid
+             */
+            charger_id: string;
+            /** Label */
+            label: string;
+            /** Charging Now */
+            charging_now: boolean;
+            /** Bookings */
+            bookings: components["schemas"]["AffectedBooking"][];
+        };
+        /** AlertOut */
+        AlertOut: {
+            /**
+             * Alert Id
+             * Format: uuid
+             */
+            alert_id: string;
+            /** Kind */
+            kind: string;
+            /** Station Name */
+            station_name?: string | null;
+            /** Message */
+            message: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Resolved At */
+            resolved_at?: string | null;
+        };
         /**
          * Alternatives
          * @description What to offer when a slot was just taken. Each entry can be booked in one tap.
@@ -941,6 +1571,24 @@ export interface components {
             /** Vehicle Id */
             vehicle_id?: string | null;
         };
+        /** BookingEventOut */
+        BookingEventOut: {
+            /** Event Id */
+            event_id: number;
+            /** From Status */
+            from_status?: string | null;
+            /** To Status */
+            to_status: string;
+            /** Actor */
+            actor: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** BookingOut */
         BookingOut: {
             /**
@@ -1010,6 +1658,54 @@ export interface components {
             /** Session Id */
             session_id?: string | null;
         };
+        /** BookingRow */
+        BookingRow: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Station Name */
+            station_name: string;
+            /** Charger Label */
+            charger_label: string;
+            /** User Email */
+            user_email?: string | null;
+            /** Booking Fee */
+            booking_fee: number;
+            /** Refund Amount */
+            refund_amount: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** BookingRows */
+        BookingRows: {
+            /** Items */
+            items: components["schemas"]["BookingRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
         /** BookingStation */
         BookingStation: {
             /**
@@ -1076,6 +1772,22 @@ export interface components {
             /** Blocks */
             blocks: components["schemas"]["AvailabilityBlock"][];
         };
+        /** ChargerCreate */
+        ChargerCreate: {
+            /** Label */
+            label: string;
+            /**
+             * Connector Type
+             * @enum {string}
+             */
+            connector_type: "CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER";
+            /** Current Type */
+            current_type?: ("AC" | "DC") | null;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+        };
         /** ChargerDetail */
         ChargerDetail: {
             /**
@@ -1103,6 +1815,24 @@ export interface components {
             is_estimated: boolean;
             /** Estimated Fields */
             estimated_fields?: string[];
+        };
+        /** ChargerEventOut */
+        ChargerEventOut: {
+            /** Event Id */
+            event_id: number;
+            /** Event */
+            event: string;
+            /** Source */
+            source: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ChargerTile */
         ChargerTile: {
@@ -1146,6 +1876,29 @@ export interface components {
              * @default []
              */
             options: components["schemas"]["WalkInOption"][];
+        };
+        /** ChargerUpdate */
+        ChargerUpdate: {
+            /** Label */
+            label?: string | null;
+            /** Connector Type */
+            connector_type?: ("CCS2" | "TYPE2" | "CHADEMO" | "BHARAT_AC001" | "BHARAT_DC001" | "TYPE1" | "OTHER") | null;
+            /** Current Type */
+            current_type?: ("AC" | "DC") | null;
+            /** Power Kw */
+            power_kw?: number | null;
+            /** Price Per Kwh */
+            price_per_kwh?: number | null;
+        };
+        /** DayCount */
+        DayCount: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Count */
+            count: number;
         };
         /** DeviceCreate */
         DeviceCreate: {
@@ -1195,6 +1948,39 @@ export interface components {
              * Format: uuid
              */
             station_id: string;
+            /** Name */
+            name: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** DeviceRename */
+        DeviceRename: {
+            /** Name */
+            name: string;
+        };
+        /** DeviceRow */
+        DeviceRow: {
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Station Name */
+            station_name: string;
             /** Name */
             name: string;
             /** Key Prefix */
@@ -1436,6 +2222,41 @@ export interface components {
              */
             can_stop: boolean;
         };
+        /** OperatorChip */
+        OperatorChip: {
+            /** Name */
+            name: string;
+            /** Station Count */
+            station_count: number;
+        };
+        /** OperatorIn */
+        OperatorIn: {
+            /** Name */
+            name: string;
+            /** Website */
+            website?: string | null;
+        };
+        /** OperatorRow */
+        OperatorRow: {
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Name */
+            name: string;
+            /** Website */
+            website?: string | null;
+            /** Station Count */
+            station_count: number;
+        };
+        /** OperatorUpdate */
+        OperatorUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Website */
+            website?: string | null;
+        };
         /**
          * OrderOut
          * @description Everything Razorpay Checkout needs. The amount comes from the server, never from the browser.
@@ -1518,6 +2339,85 @@ export interface components {
         OtpStartRequest: {
             /** Otp */
             otp: string;
+        };
+        /** OutOfServiceRequest */
+        OutOfServiceRequest: {
+            /**
+             * Cancel Bookings
+             * @default false
+             */
+            cancel_bookings: boolean;
+        };
+        /** OutOfServiceResult */
+        OutOfServiceResult: {
+            /** Status */
+            status: string;
+            /** Cancelled */
+            cancelled: number;
+            /** Refunded Total */
+            refunded_total: number;
+            /** Session Ended */
+            session_ended: boolean;
+        };
+        /** OverviewOut */
+        OverviewOut: {
+            /** Today Bookings */
+            today_bookings: number;
+            /** Active Sessions */
+            active_sessions: number;
+            /** No Shows Week */
+            no_shows_week: number;
+            /** Open Alerts */
+            open_alerts: number;
+            revenue: components["schemas"]["Revenue"];
+            /** Revenue Days */
+            revenue_days: number;
+            /** Bookings Per Day */
+            bookings_per_day: components["schemas"]["DayCount"][];
+            /** No Shows By Station */
+            no_shows_by_station: components["schemas"]["app__features__admin__schemas__StationCount"][];
+        };
+        /** PaymentRow */
+        PaymentRow: {
+            /**
+             * Payment Id
+             * Format: uuid
+             */
+            payment_id: string;
+            /** Purpose */
+            purpose: string;
+            /** Status */
+            status: string;
+            /** Amount */
+            amount: number;
+            /** Refunded Amount */
+            refunded_amount: number;
+            /** Provider Payment Id */
+            provider_payment_id?: string | null;
+            /** Station Name */
+            station_name?: string | null;
+            /** User Email */
+            user_email?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** PaymentRows */
+        PaymentRows: {
+            /** Items */
+            items: components["schemas"]["PaymentRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Amount Total */
+            amount_total: number;
+            /** Refunded Total */
+            refunded_total: number;
         };
         /** Place */
         Place: {
@@ -1636,6 +2536,54 @@ export interface components {
             percent: number;
             /** Reason */
             reason: string;
+        };
+        /** ReportOut */
+        ReportOut: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Bookings By Status */
+            bookings_by_status: components["schemas"]["StatusCount"][];
+            /** No Shows */
+            no_shows: number;
+            revenue: components["schemas"]["Revenue"];
+            /** Settlement */
+            settlement: components["schemas"]["SettlementRow"][];
+        };
+        /** Revenue */
+        Revenue: {
+            /** Booking Fees */
+            booking_fees: number;
+            /** Energy */
+            energy: number;
+            /** Walk Ins */
+            walk_ins: number;
+            /** Refunds */
+            refunds: number;
+        };
+        /** RoleChange */
+        RoleChange: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "USER" | "ADMIN";
+        };
+        /** SettlementRow */
+        SettlementRow: {
+            /** Operator Name */
+            operator_name: string;
+            /** Sessions */
+            sessions: number;
+            /** Energy Revenue */
+            energy_revenue: number;
         };
         /** SimulateRequest */
         SimulateRequest: {
@@ -1761,11 +2709,6 @@ export interface components {
             /** Chargers */
             chargers: components["schemas"]["ChargerAvailability"][];
         };
-        /** StationCount */
-        StationCount: {
-            /** Count */
-            count: number;
-        };
         /**
          * StationCreate
          * @description Admins add stations by hand; they are tagged data_source = 'manual'.
@@ -1847,6 +2790,39 @@ export interface components {
             /** Chargers */
             chargers: components["schemas"]["ChargerDetail"][];
         };
+        /** StationRow */
+        StationRow: {
+            /**
+             * Station Id
+             * Format: uuid
+             */
+            station_id: string;
+            /** Name */
+            name: string;
+            /** City */
+            city?: string | null;
+            /** Operator Name */
+            operator_name?: string | null;
+            /** Data Source */
+            data_source: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Charger Count */
+            charger_count: number;
+            /** Has Estimated Data */
+            has_estimated_data: boolean;
+        };
+        /** StationRows */
+        StationRows: {
+            /** Items */
+            items: components["schemas"]["StationRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
         /** StationSearchResponse */
         StationSearchResponse: {
             /** Stations */
@@ -1922,6 +2898,37 @@ export interface components {
             /** Eta Minutes Estimate */
             eta_minutes_estimate?: number | null;
         };
+        /** StationUpdate */
+        StationUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Address */
+            address?: string | null;
+            /** City */
+            city?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Opening Hours */
+            opening_hours?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /**
+             * Cancel Bookings
+             * @default false
+             */
+            cancel_bookings: boolean;
+        };
+        /** StatusCount */
+        StatusCount: {
+            /** Status */
+            status: string;
+            /** Count */
+            count: number;
+        };
         /** SuggestResponse */
         SuggestResponse: {
             /** Query */
@@ -1984,6 +2991,44 @@ export interface components {
             role: string;
             /** Created At */
             created_at?: string | null;
+        };
+        /** UserRow */
+        UserRow: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name?: string | null;
+            /** Role */
+            role: string;
+            /** Sign In */
+            sign_in: string;
+            /** Bookings */
+            bookings: number;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Is You
+             * @default false
+             */
+            is_you: boolean;
+        };
+        /** UserRows */
+        UserRows: {
+            /** Items */
+            items: components["schemas"]["UserRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Admins */
+            admins: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -2172,6 +3217,8 @@ export interface components {
              * @default 0
              */
             refunded: number;
+            /** Stop Code */
+            stop_code?: string | null;
         };
         /**
          * WalkInProgress
@@ -2183,10 +3230,38 @@ export interface components {
             /** Used */
             used: number;
         };
+        /** WalkInStop */
+        WalkInStop: {
+            /** Code */
+            code: string;
+        };
+        /** WalkInStopOut */
+        WalkInStopOut: {
+            /** Charger Label */
+            charger_label: string;
+            /** Prepaid */
+            prepaid: number;
+            /** Used */
+            used: number;
+            /** Refunded */
+            refunded: number;
+        };
         /** WebhookAck */
         WebhookAck: {
             /** Status */
             status: string;
+        };
+        /** StationCount */
+        app__features__admin__schemas__StationCount: {
+            /** Station Name */
+            station_name: string;
+            /** Count */
+            count: number;
+        };
+        /** StationCount */
+        app__features__stations__schemas__StationCount: {
+            /** Count */
+            count: number;
         };
     };
     responses: never;
@@ -2553,7 +3628,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StationCount"];
+                    "application/json": components["schemas"]["app__features__stations__schemas__StationCount"];
                 };
             };
         };
@@ -2728,6 +3803,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    popular_operators_api_search_operators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorChip"][];
                 };
             };
         };
@@ -3618,6 +4713,41 @@ export interface operations {
             };
         };
     };
+    stop_walk_in_api_kiosk_walk_ins_stop_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-device-key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalkInStop"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalkInStopOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_devices_api_admin_stations__station_id__devices_get: {
         parameters: {
             query?: never;
@@ -3702,6 +4832,833 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_admin_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewOut"];
+                };
+            };
+        };
+    };
+    report_api_admin_reports_get: {
+        parameters: {
+            query?: {
+                /** @description First day, India time. Default: 30 days ago. */
+                date_from?: string | null;
+                /** @description Last day, India time. Default: today. */
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    operators_api_admin_operators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorRow"][];
+                };
+            };
+        };
+    };
+    create_operator_api_admin_operators_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_operator_api_admin_operators__operator_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operator_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_operator_api_admin_operators__operator_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operator_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stations_api_admin_stations_get: {
+        parameters: {
+            query?: {
+                /** @description Part of a station, city or operator name */
+                q?: string | null;
+                /** @description name, city, operator, source, chargers or status */
+                sort?: string;
+                direction?: "asc" | "desc";
+                /** @description Only active (true) or inactive (false) stations */
+                active?: boolean | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationRows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_station_api_admin_stations__station_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_station_api_admin_stations__station_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_charger_api_admin_stations__station_id__chargers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                station_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChargerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_charger_api_admin_chargers__charger_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChargerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    affected_by_out_of_service_api_admin_chargers__charger_id__affected_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    out_of_service_api_admin_chargers__charger_id__out_of_service_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutOfServiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutOfServiceResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_api_admin_chargers__charger_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutOfServiceResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    charger_events_api_admin_chargers__charger_id__events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                charger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargerEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bookings_api_admin_bookings_get: {
+        parameters: {
+            query?: {
+                station_id?: string | null;
+                status?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingRows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    booking_events_api_admin_bookings__booking_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    devices_api_admin_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRow"][];
+                };
+            };
+        };
+    };
+    alerts_api_admin_alerts_get: {
+        parameters: {
+            query?: {
+                include_seen?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    alert_seen_api_admin_alerts__alert_id__seen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    users_api_admin_users_get: {
+        parameters: {
+            query?: {
+                /** @description Part of an email or name */
+                q?: string | null;
+                role?: ("USER" | "ADMIN") | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_role_api_admin_users__user_id__role_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payments_api_admin_payments_get: {
+        parameters: {
+            query?: {
+                purpose?: ("BOOKING_FEE" | "ENERGY" | "WALKIN_PREPAID") | null;
+                status?: ("CREATED" | "CAPTURED" | "FAILED" | "REFUNDED" | "PARTIALLY_REFUNDED") | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_api_admin_activity_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityRows"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_device_api_admin_devices__device_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_device_api_admin_devices__device_id__rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceCreated"];
                 };
             };
             /** @description Validation Error */

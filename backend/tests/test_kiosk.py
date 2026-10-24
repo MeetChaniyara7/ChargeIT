@@ -18,7 +18,7 @@ from app.core.errors import AppError
 from app.features.bookings import service as bookings
 from app.features.bookings.models import Booking
 from app.features.jobs.lazy import run_due_jobs
-from app.features.kiosk import admin_router, keys, service as kiosk, walkin
+from app.features.kiosk import admin_router, keys, service as kiosk, stop, walkin
 from app.features.kiosk.models import AdminAlert, StationDevice
 from app.features.kiosk.schemas import WalkInCreate
 from app.features.payments import service as payments
@@ -326,7 +326,7 @@ def test_a_walk_in_holds_the_charger_for_three_minutes_and_returns_a_payment_lin
     assert out.payment_url.startswith("https://rzp.test/plink_fake_") and out.charger_label == "A"
     booking = db.get(Booking, out.walk_in_id)
     assert (booking.source, booking.status, booking.user_id, booking.hold_expires_at) == ("WALK_IN", "HELD", None, NOW + 3 * M)
-    assert booking.start == NOW and booking.end == NOW + 120 * M  # no booking ahead: the 2-hour maximum
+    assert booking.start == NOW and booking.end == NOW + 60 * M  # no booking ahead: the 1-hour maximum
     link = next(iter(fake.links.values()))
     assert link["amount"] == 20000 and link["notes"]["purpose"] == "WALKIN_PREPAID"
     payment = db.query(Payment).filter_by(booking_id=out.walk_in_id).one()
@@ -610,11 +610,11 @@ def test_charging_stops_before_the_next_booking(db, world, fake):
 def test_charging_stops_when_the_walk_in_window_ends(db, world, fake):
     world["slow"] = make_charger(db, world["station"], "TYPE2", 7, 5, label="SLOW")  # 6.3 kW at Rs 5: Rs 500 would last for hours
     out, status = _start_paid_walk_in(db, world, fake, amount=500, charger="slow")
-    run_due_jobs(db, NOW + 125 * M, world["station"])
+    run_due_jobs(db, NOW + 65 * M, world["station"])
     session = db.execute(text("SELECT ended_at, end_reason, bill_amount FROM charging_sessions WHERE session_id = :s"), {"s": status.session_id}).one()
-    assert session.end_reason == "SLOT_END_AUTO_STOP" and session.ended_at == NOW + 120 * M  # the 2-hour maximum
-    assert float(session.bill_amount) == 63.0  # 6.3 kW x 2 h = 12.6 kWh x Rs 5
-    assert float(db.query(Payment).filter_by(booking_id=out.walk_in_id).one().refunded_amount) == 437.0
+    assert session.end_reason == "SLOT_END_AUTO_STOP" and session.ended_at == NOW + 60 * M  # the 1-hour maximum
+    assert float(session.bill_amount) == 31.5  # 6.3 kW x 1 h = 6.3 kWh x Rs 5
+    assert float(db.query(Payment).filter_by(booking_id=out.walk_in_id).one().refunded_amount) == 468.5
     assert value(db, "SELECT status FROM chargers WHERE charger_id = :c", c=world["slow"]) == "AVAILABLE"
 
 
@@ -627,6 +627,61 @@ def test_settling_twice_changes_nothing(db, world, fake):
         )
     db.commit()
     assert float(db.query(Payment).filter_by(booking_id=out.walk_in_id).one().refunded_amount) == 92.0
+
+
+# ---------------------------------------------------------------- walk-ins: stopping early with the stop code
+
+def test_a_new_walk_in_gets_a_stop_code_and_only_its_hash_is_stored(db, world, fake):
+    out = walk_in(db, world, fake)
+    assert out.stop_code is not None and len(out.stop_code) == 6 and out.stop_code.isdigit()
+    stored = value(db, "SELECT otp_hash FROM bookings WHERE booking_id = :b", b=out.walk_in_id)
+    assert stored is not None and out.stop_code not in str(stored)
+    assert walkin.get(db, world["device"], out.walk_in_id, fake, NOW).stop_code is None  # shown once, in the answer that creates it
+
+
+def test_the_stop_code_stops_charging_and_records_the_refund(db, world, fake):
+    out, status = _start_paid_walk_in(db, world, fake, amount=200)
+    result = stop.stop_walk_in(db, world["device"], out.stop_code, NOW + 6 * M)
+    assert (result.charger_label, result.prepaid, result.used, result.refunded) == ("A", 200.0, 108.0, 92.0)
+    payment = db.query(Payment).filter_by(booking_id=out.walk_in_id).one()
+    assert (payment.status, float(payment.refunded_amount)) == ("PARTIALLY_REFUNDED", 92.0)
+    assert value(db, "SELECT status FROM chargers WHERE charger_id = :c", c=world["a"]) == "AVAILABLE"
+    assert value(db, "SELECT end_reason FROM charging_sessions WHERE session_id = :s", s=status.session_id) == "USER_STOP"
+
+
+def test_a_wrong_stop_code_stops_nothing_and_counts_towards_the_cooldown(db, world, fake):
+    out, status = _start_paid_walk_in(db, world, fake, amount=200)
+    wrong = "000000" if out.stop_code != "000000" else "111111"
+    with pytest.raises(AppError) as error:
+        stop.stop_walk_in(db, world["device"], wrong, NOW + 2 * M)
+    assert (error.value.code, error.value.details["tries_left"]) == ("WRONG_OTP", 4)
+    assert value(db, "SELECT ended_at IS NULL FROM charging_sessions WHERE session_id = :s", s=status.session_id) is True
+    for _ in range(4):
+        with pytest.raises(AppError) as error:
+            stop.stop_walk_in(db, world["device"], wrong, NOW + 2 * M)
+    assert error.value.code == "OTP_COOLDOWN"
+    with pytest.raises(AppError) as error:  # even the right code waits while cooling down
+        stop.stop_walk_in(db, world["device"], out.stop_code, NOW + 2 * M)
+    assert error.value.code == "OTP_COOLDOWN"
+
+
+def test_a_stop_code_cannot_be_used_twice_or_at_another_station(db, world, fake):
+    out, _ = _start_paid_walk_in(db, world, fake, amount=200)
+    with pytest.raises(AppError) as error:
+        stop.stop_walk_in(db, world["other_device"], out.stop_code, NOW + 2 * M)
+    assert error.value.code == "WRONG_OTP"
+    stop.stop_walk_in(db, world["device"], out.stop_code, NOW + 6 * M)
+    with pytest.raises(AppError) as error:
+        stop.stop_walk_in(db, world["device"], out.stop_code, NOW + 7 * M)
+    assert error.value.code == "WRONG_OTP"
+
+
+def test_a_booking_code_does_not_stop_a_walk_in(db, world, fake):
+    _, plain = booked(db, world, charger="b", start=NOW + 90 * M)
+    _start_paid_walk_in(db, world, fake, amount=200)
+    with pytest.raises(AppError) as error:
+        stop.stop_walk_in(db, world["device"], plain, NOW + 2 * M)
+    assert error.value.code == "WRONG_OTP"
 
 
 # ---------------------------------------------------------------- the device key over HTTP

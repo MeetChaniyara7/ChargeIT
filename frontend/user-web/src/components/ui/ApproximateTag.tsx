@@ -22,7 +22,9 @@ export function ApproximateTag({
       <button
         type="button"
         aria-describedby={tipId}
-        className="inline-flex items-center rounded-full border border-dotted border-muted px-2 py-0.5 text-xs font-medium text-muted"
+        data-hit="expanded"
+        // The tag is small on purpose; this invisible ring around it makes the tap area at least 44 px.
+        className="relative inline-flex items-center rounded-full border border-dotted border-muted px-2 py-0.5 text-xs font-medium text-muted after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']"
       >
         Approximate
       </button>

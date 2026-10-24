@@ -26,11 +26,13 @@ interface StationCardProps {
   trip?: TripInfo;
   /** Position in the list: later cards fade in a moment after earlier ones. */
   index?: number;
+  /** Give the card its page address (used to scroll to it). Off for the recommended copy of a station that is also in the list: ids must be unique. */
+  anchor?: boolean;
 }
 
 const minutesText = (minutes: number, routed: boolean) => `${routed ? '' : '~'}${Math.max(1, Math.round(minutes))} min`;
 
-export const StationCard: React.FC<StationCardProps> = ({ station, isSelected = false, onSelect, showDistance = false, reason, trip, index = 0 }) => {
+export const StationCard: React.FC<StationCardProps> = ({ station, isSelected = false, onSelect, showDistance = false, reason, trip, index = 0, anchor = true }) => {
   const free = station.charger_free;
   const total = station.charger_total;
   const distance = trip ? trip.distanceKm : station.distance_km;
@@ -38,7 +40,7 @@ export const StationCard: React.FC<StationCardProps> = ({ station, isSelected = 
 
   return (
     <Card
-      id={`station-card-${station.station_id}`}
+      id={anchor ? `station-card-${station.station_id}` : undefined}
       elevation={isSelected ? 2 : 1}
       style={{ '--i': Math.min(index, 8) } as React.CSSProperties}
       className={cx(
@@ -58,7 +60,7 @@ export const StationCard: React.FC<StationCardProps> = ({ station, isSelected = 
                 e.stopPropagation();
                 onSelect?.(station.station_id);
               }}
-              className="rounded text-left hover:text-primary"
+              className="-my-2.5 rounded py-2.5 text-left hover:text-primary"
             >
               {station.name}
             </button>

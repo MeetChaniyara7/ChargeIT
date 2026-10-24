@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from app.config import BOOKING_RULES, CHARGING_RULES
 from app.core.errors import AppError
 from app.features.availability.occupancy import occupies_charger
-from app.features.bookings import service as bookings, state_machine
+from app.features.bookings import otp, service as bookings, state_machine
 from app.features.bookings.instant import instant_window
 from app.features.bookings.models import Booking
 from app.features.charging.models import ChargingSession
@@ -45,7 +45,9 @@ POLL_PROVIDER_EVERY_SECONDS = 3.0
 _last_asked: dict[str, float] = {}  # payment link id -> when we last asked Razorpay (so a busy kiosk does not flood it)
 
 
-def _out(booking: Booking, charger: Charger, payment: Payment | None, now: datetime, url: str | None, session_id: UUID | None) -> WalkInOut:
+def _out(
+    booking: Booking, charger: Charger, payment: Payment | None, now: datetime, url: str | None, session_id: UUID | None, stop_code: str | None = None
+) -> WalkInOut:
     effective = bookings.effective_status(booking, now)
     if effective == "HELD":
         status = "WAITING_FOR_PAYMENT"
@@ -60,7 +62,7 @@ def _out(booking: Booking, charger: Charger, payment: Payment | None, now: datet
         walk_in_id=booking.booking_id, status=status, charger_id=charger.charger_id, charger_label=charger.label,
         amount=float(payment.amount) if payment else 0, payment_url=url if status == "WAITING_FOR_PAYMENT" else None,
         expires_at=expires, server_time=now, seconds_left=max(0, int((expires - now).total_seconds())) if status == "WAITING_FOR_PAYMENT" else 0,
-        session_id=session_id, refunded=float(payment.refunded_amount) if payment else 0,
+        session_id=session_id, refunded=float(payment.refunded_amount) if payment else 0, stop_code=stop_code,
     )
 
 
@@ -125,9 +127,16 @@ def create(db: Session, device: StationDevice, body: WalkInCreate, gateway: Gate
 
             state_machine.check(None, "HELD", "WALK_IN")
             state_machine.set_actor(db, "DEVICE", "Walk-in at the kiosk")
+            # The stop code: only its HMAC is stored (like a booking code); the plain code goes back in this one answer.
+            taken = db.scalars(
+                select(Booking.otp_hash).join(Charger, Charger.charger_id == Booking.charger_id).where(
+                    Charger.station_id == device.station_id, Booking.source == "WALK_IN", Booking.status.in_(("HELD", "ACTIVE")), Booking.otp_hash.is_not(None)
+                )
+            ).all()
+            stop_code, stop_hash = otp.generate(taken)
             booking = Booking(
                 charger_id=charger.charger_id, source="WALK_IN", status="HELD", time_range=Range(window[0], window[1], bounds="[)"),
-                hold_expires_at=now + timedelta(minutes=BOOKING_RULES.walkin_qr_hold_minutes), booking_fee=0,
+                hold_expires_at=now + timedelta(minutes=BOOKING_RULES.walkin_qr_hold_minutes), booking_fee=0, otp_hash=stop_hash,
             )
             db.add(booking)
             db.flush()
@@ -161,7 +170,7 @@ def create(db: Session, device: StationDevice, body: WalkInCreate, gateway: Gate
     db.add(payment)
     db.commit()
     db.refresh(booking)
-    return _out(booking, charger, payment, now, url, None)
+    return _out(booking, charger, payment, now, url, None, stop_code)
 
 
 def _free(db: Session, booking_id: UUID, reason: str) -> None:

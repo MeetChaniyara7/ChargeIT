@@ -115,7 +115,7 @@ class BookingRules:
     no_show_after_start: int = 10
     end_of_slot_warning: int = 5
     buffer_before_next_booking: int = 5
-    instant_booking_max_minutes: int = 120
+    instant_booking_max_minutes: int = 60  # "Charge now" and kiosk walk-ins last at most this long
     instant_min_minutes: int = 15  # "Charge now" needs at least this much free time before the next booking
     walkin_amounts_inr: tuple[int, ...] = (100, 200, 500)
     # Checked top to bottom: the first tier the cancellation qualifies for wins.

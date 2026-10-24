@@ -8,7 +8,7 @@ Code: `frontend/kiosk/` (the app), `backend/app/features/kiosk/` (the API). The 
 
 | Screen | What it does |
 |---|---|
-| **Setup** (first run) | Paste the kiosk key; the server checks it before it is saved on the tablet. A long press (3 seconds) on the ChargeSpot logo in any header comes back here. A key the server later refuses is forgotten and this screen explains why. |
+| **Setup** (first run) | Paste the kiosk key; the server checks it before it is saved on the tablet. Later, the **Change station** button (the gear in the header) or a long press (3 seconds) on the ChargeSpot logo opens it again: it shows which station the tablet is set up for, keeps that station until a valid new key is pasted, has a Cancel button, and closes itself after 60 seconds without a touch. A key the server later refuses is forgotten and this screen explains why. |
 | **Status board** (home) | A tile per charger: number, plug, kW, price per kWh, state (Free, Reserved, Charging with a progress bar, Being taken, Out of service), "free until 6:30 PM", "Reserved for 5:00 PM", "Walk-in · ₹120 of ₹200 used". A walk-in that just finished shows "Done · used ₹186 · ₹14 refunded" for 2 minutes. Station name and the India-time clock (from the server's clock) are in the header. Two big buttons: "Booked? Enter your code" and "No booking? Charge here". After 2 minutes without a touch the two buttons take turns glowing. |
 | **Enter your code** | Six boxes and a number pad (digits, Clear, delete). The 6th digit sends the code. "Wrong code, 3 tries left"; "Too many tries. Please wait 1:42"; a clear message when the code is not valid yet or any more. |
 | **Code accepted / Payment received** | Full screen: "Go to Charger CCS2-1 and plug in", with the plug type. Returns to the board after 8 seconds, or on "Done". |
@@ -21,6 +21,10 @@ Code: `frontend/kiosk/` (the app), `backend/app/features/kiosk/` (the API). The 
 Every screen except the QR code goes back to the board after 30 seconds without a touch. The QR screen ends by itself (paid, 3 minutes, or Cancel).
 
 Sizes: the root font is 20 px (base text 20 px, headings 40 px and up), buttons are at least 80 px tall, no hover-only behaviour, dark theme from `tokens.css`. Checked at 1280 × 800 and 1024 × 768 (the layout switches at 1200 px).
+
+## Stopping a walk-in early
+
+A walk-in has no account, so it cannot be tracked or stopped from the app. After paying, the kiosk shows a 6-digit **stop code** once (25 seconds). Pressing **Stop & refund** on the board and typing it ends the charging: the energy used is billed and the unused part of the prepaid amount is recorded as a refund. The code only works at the same station, once, and wrong tries count towards the normal cooldown and alert. A lost code: an admin can stop the session from Admin, Simulator, Unplug.
 
 ## Setting up a real tablet
 

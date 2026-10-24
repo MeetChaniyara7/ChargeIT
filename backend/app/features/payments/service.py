@@ -13,6 +13,7 @@ Rules (docs/architecture.md section 8):
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -26,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.config import BOOKING_RULES, get_settings, require_setting
 from app.core.errors import AppError
+from app.features.admin.alerts import raise_alert
 from app.features.bookings import otp, service as bookings, state_machine
 from app.features.bookings.models import Booking
 from app.features.charging import service as charging
@@ -35,6 +37,8 @@ from app.features.kiosk import walkin
 from app.features.payments.gateway import Gateway, verify_payment_signature, verify_webhook_signature
 from app.features.payments.models import Payment, WebhookEvent
 from app.features.payments.schemas import EnergyOrderOut, OrderOut, VerifyOut, VerifyRequest
+
+logger = logging.getLogger(__name__)
 
 # Checkout closes this many seconds before the hold would run out.
 CHECKOUT_MARGIN_SECONDS = 15
@@ -272,6 +276,8 @@ def _event_ids(payload: dict) -> tuple[str | None, str | None]:
 def handle_webhook(db: Session, body: bytes, signature: str, event_id: str | None, now: datetime) -> str:
     """Razorpay tells us about a payment. Verified, de-duplicated, and used only as a backup for /verify."""
     if not verify_webhook_signature(body, signature, require_setting("razorpay_webhook_secret")):
+        # Anyone can post to this address, so a bad signature is one alert per 10 minutes, not one per attempt.
+        raise_alert(db, "WEBHOOK_FAILED", "A webhook call had an invalid signature.", {"reason": "INVALID_SIGNATURE"})
         raise AppError(400, "INVALID_SIGNATURE", "Invalid webhook signature.")
     try:
         payload = json.loads(body)
@@ -283,6 +289,21 @@ def handle_webhook(db: Session, body: bytes, signature: str, event_id: str | Non
     event_type = str(payload.get("event", ""))
     # Razorpay numbers every delivery of an event the same way, so a repeat is recognised.
     event_key = event_id or sha256(body).hexdigest()
+    try:
+        return _process_event(db, payload, event_type, event_key, now)
+    except Exception as exc:
+        # Undo everything (including the event row, so Razorpay's retry is processed afresh), tell the admin, and
+        # answer with an error so Razorpay tries again.
+        db.rollback()
+        logger.exception("Webhook %s could not be processed", event_key)
+        raise_alert(
+            db, "WEBHOOK_FAILED", f"A {event_type or 'webhook'} event could not be processed.",
+            {"event_id": event_key, "event": event_type, "error": f"{type(exc).__name__}: {exc}"[:300]},
+        )
+        raise
+
+
+def _process_event(db: Session, payload: dict, event_type: str, event_key: str, now: datetime) -> str:
     inserted = db.execute(
         pg_insert(WebhookEvent)
         .values(provider_event_id=event_key, event_type=event_type, payload=payload)

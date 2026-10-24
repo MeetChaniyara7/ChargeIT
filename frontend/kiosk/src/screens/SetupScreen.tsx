@@ -5,6 +5,7 @@ import { KioskButton } from '../components/KioskButton';
 import { Logo } from '../components/Logo';
 import { Spinner } from '../components/Spinner';
 import { ApiError, kioskFetch, keyStorage } from '../lib/api';
+import { useIdleTimer } from '../lib/useIdleTimer';
 import type { KioskStatus } from '../lib/api';
 
 interface SetupScreenProps {
@@ -14,6 +15,10 @@ interface SetupScreenProps {
   onCancel?: () => void;
   /** Why we are here again, e.g. "This kiosk key is not valid any more." */
   notice?: string | null;
+  /** The station this tablet is set up for right now (shown when staff open this screen on purpose). */
+  currentStation?: string | null;
+  /** After this many seconds without a touch a screen that was opened on purpose closes itself. */
+  idleSeconds?: number;
 }
 
 function explain(error: unknown): string {
@@ -27,11 +32,14 @@ function explain(error: unknown): string {
 }
 
 /** First run: paste the kiosk key once. The server checks it before it is saved on this tablet. */
-export function SetupScreen({ onConnected, onCancel, notice }: SetupScreenProps) {
+export function SetupScreen({ onConnected, onCancel, notice, currentStation, idleSeconds = 60 }: SetupScreenProps) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stationName, setStationName] = useState<string | null>(null);
+
+  // Opened on purpose by someone who then walked away: go back to the board instead of staying on this screen.
+  useIdleTimer(Boolean(onCancel) && !busy && stationName === null, idleSeconds, () => onCancel?.());
 
   const connect = async (event: FormEvent) => {
     event.preventDefault();
@@ -62,8 +70,12 @@ export function SetupScreen({ onConnected, onCancel, notice }: SetupScreenProps)
       <Logo />
       <form onSubmit={connect} className="w-full max-w-3xl space-y-6">
         <div className="space-y-2 text-center">
-          <h1 className="text-5xl font-extrabold">Set up this kiosk</h1>
-          <p className="text-xl text-muted">Paste the kiosk key you were given for this station. You only do this once.</p>
+          <h1 className="text-5xl font-extrabold">{currentStation ? 'Change station' : 'Set up this kiosk'}</h1>
+          <p className="text-xl text-muted">
+            {currentStation
+              ? `This tablet is set up for ${currentStation}. To move it to another station, paste that station's kiosk key below. Press Cancel to keep things as they are.`
+              : 'Paste the kiosk key you were given for this station. You only do this once.'}
+          </p>
         </div>
         {notice && (
           <p role="alert" className="rounded-card border-2 border-warning/60 bg-warning/10 p-4 text-center text-xl">

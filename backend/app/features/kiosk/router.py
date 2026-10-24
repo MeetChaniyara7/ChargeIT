@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.features.kiosk import service, walkin
+from app.features.kiosk import service, stop, walkin
 from app.features.kiosk.dependencies import get_current_device
 from app.features.kiosk.models import StationDevice
-from app.features.kiosk.schemas import KioskStatus, OtpStartOut, OtpStartRequest, WalkInCreate, WalkInOut
+from app.features.kiosk.schemas import KioskStatus, OtpStartOut, OtpStartRequest, WalkInCreate, WalkInOut, WalkInStop, WalkInStopOut
 from app.features.payments.gateway import Gateway, get_gateway
 
 router = APIRouter(prefix="/api/kiosk", tags=["Kiosk"])
@@ -55,3 +55,9 @@ def get_walk_in(
 def cancel_walk_in(walk_in_id: UUID, device: StationDevice = Depends(get_current_device), db: Session = Depends(get_db)):
     """Back out of the QR screen: the charger is free again at once."""
     return walkin.cancel(db, device, walk_in_id, _now())
+
+
+@router.post("/walk-ins/stop", response_model=WalkInStopOut)
+def stop_walk_in(body: WalkInStop, device: StationDevice = Depends(get_current_device), db: Session = Depends(get_db)):
+    """Stop a walk-in early with the stop code it was given. The energy used is billed; the unused money is recorded as a refund."""
+    return stop.stop_walk_in(db, device, body.code, _now())

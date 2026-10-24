@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { BatteryCharging, Map, Ticket, User } from 'lucide-react';
+import { BatteryCharging, Map, ShieldCheck, Ticket, User } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { initialsOf } from '../../features/auth/initials';
@@ -25,6 +25,9 @@ const NAV: NavItem[] = [
   { to: '/charging', label: 'Charging', icon: BatteryCharging },
   { to: '/profile', label: 'Profile', icon: User },
 ];
+
+// Only admins get this one. The server checks the role on every admin request; this just keeps the link out of sight.
+const ADMIN_ITEM: NavItem = { to: '/admin', label: 'Admin', icon: ShieldCheck };
 
 /** A small green dot that breathes: something is happening here. */
 const LiveDot = ({ className }: { className?: string }) => (
@@ -66,6 +69,7 @@ function Frame() {
   const { user } = useAuth();
   const { active } = useActiveSession();
   const reconnecting = useRealtimeDown();
+  const nav = user?.role === 'ADMIN' ? [...NAV, ADMIN_ITEM] : NAV;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -78,7 +82,7 @@ function Frame() {
           <Logo to="/explore" />
 
           <nav aria-label="Main" className="ml-4 hidden items-center gap-1 md:flex">
-            {NAV.map(({ to, label, icon: Icon }) => (
+            {nav.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -125,7 +129,7 @@ function Frame() {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
       >
         <ul className="mx-auto flex h-16 max-w-md items-stretch">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, label, icon: Icon }) => (
             <li key={to} className="flex-1">
               <NavLink
                 to={to}

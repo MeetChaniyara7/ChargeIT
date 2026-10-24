@@ -2,6 +2,20 @@
 
 Newest first. Dates are from the git history; commit hashes are given where there is a commit.
 
+## 2026-10-22: Phase 7 group (a), the admin area and edge cases (branch `phase-7-release`, not committed yet)
+
+- **Database:** migration `015_admin.sql`: charger events `OUT_OF_SERVICE` and `RESTORE`; alert kind `WEBHOOK_FAILED`; indexes on bookings and payments for the admin lists.
+- **API:** `features/admin/` with `/api/admin/overview`, `reports`, `operators`, `stations` (list, detail, edit), chargers (add, edit, affected bookings, out of service, restore, events), `bookings` (list, history), `devices`, `alerts` (list, mark seen); out of service cancels future bookings with a full refund only when the admin confirms (`409 HAS_FUTURE_BOOKINGS` otherwise); failed webhooks raise alerts. Error codes added: `HAS_FUTURE_BOOKINGS`, `NOT_OUT_OF_SERVICE`, `OPERATOR_NOT_FOUND`, `CHARGER_LABEL_TAKEN`, `INVALID_SORT`, `INVALID_RANGE`, `ALERT_NOT_FOUND`.
+- **Web app:** `/admin` pages (Overview, Stations, station editor with chargers and the out-of-service dialog, Bookings with history, Kiosks, Simulator, Alerts); new shared components `DataTable`, `Pagination`, `StatTile`, `ColumnChart`, `BarList`, `ConfirmDialog`; error page, 404 page, offline notice, session-ended notice; double-tap guard on the booking-fee Pay button; an admin link for admins.
+- **Admin management (added the same day, at the owner's request):** migration `016_admin_activity.sql` (`admin_actions`); `/api/admin/users` and `users/{id}/role`, `operators` (add, edit, delete), `payments`, `activity`, `devices/{id}` (rename) and `devices/{id}/rotate`; every admin change is written to the activity log; the admin has its own screen with a grouped sidebar and the pages Users and roles, Operators, Payments, Activity log, and Kiosks (rename, replace key, revoke). Error codes added: `CANNOT_CHANGE_OWN_ROLE`, `LAST_ADMIN`, `USER_NOT_FOUND`, `OPERATOR_NAME_TAKEN`, `OPERATOR_IN_USE`, `DEVICE_REVOKED`. Backend tests 711.
+- **Charge now and kiosk walk-ins now last at most 1 hour** (was 2): `instant_booking_max_minutes` is 60 in `config.py`; the walk-in window and its amounts follow the same rule.
+- **Kiosk bug fix:** the walk-in QR code no longer disappears after the first payment check (the server only sends the payment link when the walk-in is created; the screen now keeps that first link).
+- **Walk-in stop code:** a walk-in gets a 6-digit stop code when it is created (shown once on the kiosk after payment; only its HMAC is stored). `POST /api/kiosk/walk-ins/stop` with that code ends the charging, bills the energy used and records the unused prepaid amount as a refund (test mode: recorded, no money moves). Wrong stop codes share the cooldown and alert of wrong booking codes. Kiosk: "Stop & refund" button on the board, stop code pad, result screen. Backend tests 716.
+- **Kiosk:** a visible **Change station** button (gear) in the header opens the setup screen with the current station shown, Cancel, and an automatic return after 60 seconds.
+- **Audit fixes:** one `h1` on Explore; unique element ids (the recommended copy of a station no longer repeats the list card id); 44 px tap areas (search box, locate button, back button, Charge now, name buttons, slot cells); the tiny "Approximate" tag keeps its look with a larger invisible tap area; tables scroll inside their box and the overview no longer scrolls sideways on a phone. Details and the exceptions: `docs/audit.md`.
+- **Tests:** backend 685 (admin 47), database 131 (admin 6), web 25 (admin validation 8), kiosk 15, shared 40; builds clean; lint shows only the 2 old warnings.
+- **Docs:** `API.md`, `SCHEMA.md` regenerated; `phases.md` as built; `PLAN.md`, `SPEC.md`, `DECISIONS.md`, `docs/audit.md`.
+
 ## 2026-10-22: Phase 6, the station kiosk and energy billing (branch `phase-6-kiosk`, not committed yet)
 
 - **Database:** migration `014_kiosk.sql`: table `admin_alerts`; `finish_session` and `auto_stop_sessions` replaced so a walk-in is billed at most what it prepaid, the leftover is recorded as a refund on the payment, and a walk-in stops at the end of its window.

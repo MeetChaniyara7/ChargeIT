@@ -1,12 +1,13 @@
 # Database schema
 
-PostgreSQL (Supabase in production, plain PostgreSQL for tests). This file was generated from a database with **all 14 migrations applied** (`database/migrations/001` to `014`). The migration files are the source of truth: never edit an applied one, add a new numbered file. Every table has row-level security switched on with no policies, so Supabase's public REST API can read and write nothing; only the API (connecting as the table owner) can.
+PostgreSQL (Supabase in production, plain PostgreSQL for tests). This file was generated from a database with **all 16 migrations applied** (`database/migrations/001` to `016`). The migration files are the source of truth: never edit an applied one, add a new numbered file. Every table has row-level security switched on with no policies, so Supabase's public REST API can read and write nothing; only the API (connecting as the table owner) can.
 
 ## Overview
 
 | Table | Migration | Purpose | SQLAlchemy model |
 |---|---|---|---|
-| `admin_alerts` | 014 | Flags the system raises for the admin page (kiosk code guessing today). Phase 7 shows them. | none (raw SQL only) |
+| `admin_actions` | 016 | What admins changed and who did it: roles, kiosk keys, out of service, edits (the admin activity log). | none (raw SQL only) |
+| `admin_alerts` | 014 | Flags the system raises for the admin page: kiosk code guessing and failed payment webhooks (kind check extended in 015). An alert that repeats within 10 minutes is shown once. | none (raw SQL only) |
 | `allowed_booking_transitions` | 004 | The legal status moves, as data. The trigger reads it; `state_machine.py` has an identical copy (a test compares them). | none (raw SQL only) |
 | `booking_events` | 004 | History of every status change, written by the trigger (who, why, when). Also a row when a booking is moved to another charger. | none (raw SQL only) |
 | `bookings` | 004 | Every way a charger gets used (app, instant, walk-in). The exclusion constraint forbids two live bookings overlapping on one charger; a trigger allows only legal status changes. | `backend/app/features/bookings/models.py` |
@@ -32,6 +33,7 @@ Tables without a model are read or written with plain SQL or by the database its
 
 ```mermaid
 erDiagram
+    users ||--o{ admin_actions : "admin_user_id"
     station_devices ||--o{ admin_alerts : "device_id"
     stations ||--o{ admin_alerts : "station_id"
     bookings ||--o{ booking_events : "booking_id"
@@ -63,9 +65,37 @@ The allowed values are mirrored in `frontend/shared/src/constants.ts` (`CONNECTO
 
 ## Tables
 
+### `admin_actions`
+
+What admins changed and who did it: roles, kiosk keys, out of service, edits (the admin activity log). (migration 016; row-level security: on)
+
+| Column | Type | Null? | Default |
+|---|---|---|---|
+| `action_id` | `bigint` | no | `(identity)` |
+| `admin_user_id` | `uuid` | yes |  |
+| `admin_email` | `text` | no |  |
+| `action` | `text` | no |  |
+| `target` | `text` | yes |  |
+| `details` | `jsonb` | no | `'{}'::jsonb` |
+| `created_at` | `timestamp with time zone` | no | `now()` |
+
+**Constraints**
+
+- Foreign key `admin_actions_admin_user_id_fkey`: `FOREIGN KEY (admin_user_id) REFERENCES users(user_id) ON DELETE SET NULL`
+- n `admin_actions_action_id_not_null`: `NOT NULL action_id`
+- n `admin_actions_action_not_null`: `NOT NULL action`
+- n `admin_actions_admin_email_not_null`: `NOT NULL admin_email`
+- n `admin_actions_created_at_not_null`: `NOT NULL created_at`
+- n `admin_actions_details_not_null`: `NOT NULL details`
+- Primary key `admin_actions_pkey`: `PRIMARY KEY (action_id)`
+
+**Indexes**
+
+- `admin_actions_time`: `btree (created_at DESC)`
+
 ### `admin_alerts`
 
-Flags the system raises for the admin page (kiosk code guessing today). Phase 7 shows them. (migration 014; row-level security: on)
+Flags the system raises for the admin page: kiosk code guessing and failed payment webhooks (kind check extended in 015). An alert that repeats within 10 minutes is shown once. (migration 014; row-level security: on)
 
 | Column | Type | Null? | Default |
 |---|---|---|---|
@@ -80,7 +110,7 @@ Flags the system raises for the admin page (kiosk code guessing today). Phase 7 
 
 **Constraints**
 
-- Check `admin_alerts_kind_check`: `CHECK ((kind = 'KIOSK_OTP_GUESSING'::text))`
+- Check `admin_alerts_kind_check`: `CHECK ((kind = ANY (ARRAY['KIOSK_OTP_GUESSING'::text, 'WEBHOOK_FAILED'::text])))`
 - Foreign key `admin_alerts_device_id_fkey`: `FOREIGN KEY (device_id) REFERENCES station_devices(device_id) ON DELETE SET NULL`
 - Foreign key `admin_alerts_station_id_fkey`: `FOREIGN KEY (station_id) REFERENCES stations(station_id) ON DELETE CASCADE`
 - n `admin_alerts_alert_id_not_null`: `NOT NULL alert_id`
@@ -198,8 +228,10 @@ Every way a charger gets used (app, instant, walk-in). The exclusion constraint 
 
 - `bookings_active_charger`: `btree (charger_id) WHERE (status = 'ACTIVE'::text)`
 - `bookings_confirmed_start`: `btree (lower(time_range)) WHERE (status = 'CONFIRMED'::text)`
+- `bookings_created`: `btree (created_at DESC)`
 - `bookings_held_expiry`: `btree (hold_expires_at) WHERE (status = 'HELD'::text)`
 - `bookings_one_hold_per_user`: `btree (user_id) WHERE ((status = 'HELD'::text) AND (user_id IS NOT NULL))`
+- `bookings_status_start`: `btree (status, lower(time_range))`
 - `bookings_user_created`: `btree (user_id, created_at DESC)`
 
 **Triggers**
@@ -463,6 +495,7 @@ Razorpay payments: the booking fee, the energy bill (`ENERGY`) and a walk-in's p
 **Indexes**
 
 - `payments_booking`: `btree (booking_id)`
+- `payments_purpose_status`: `btree (purpose, status)`
 
 **Triggers**
 
@@ -693,7 +726,7 @@ All in `public`. Jobs and event functions take `p_now timestamptz DEFAULT now()`
 
 | Function | Returns | What it does |
 |---|---|---|
-| `apply_charger_event(p_charger uuid, p_event text, p_details jsonb, p_source text, p_now timestamp with time zone)` | `text` | The only way a charger's status changes; logs to `charger_events`; returns the new status or `REJECTED`. (011) |
+| `apply_charger_event(p_charger uuid, p_event text, p_details jsonb, p_source text, p_now timestamp with time zone)` | `text` | The only way a charger's status changes; logs to `charger_events`; returns the new status or `REJECTED`. Admin events `OUT_OF_SERVICE` and `RESTORE` added in 015. (011, replaced in 015) |
 | `apply_reservation_locks(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: reserves chargers 15 minutes before a booking, releases them afterwards, sets/clears driver warnings. (011) |
 | `auto_stop_sessions(p_now timestamp with time zone, p_station uuid)` | `integer` | Job: stops sessions at slot end (walk-ins: before the next booking, at the end of their window, or when prepaid runs out) and bills them. (011, replaced in 014) |
 | `charger_is_locked(p_charger uuid, p_now timestamp with time zone)` | `boolean` | True while a confirmed booking reserves the charger (from 15 minutes before start until it ends). (011) |

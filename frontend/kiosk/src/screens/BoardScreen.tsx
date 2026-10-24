@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyRound, Plug } from 'lucide-react';
+import { KeyRound, Plug, Square } from 'lucide-react';
 import { ChargerTileCard } from '../components/ChargerTileCard';
 import { cx } from '../components/cx';
 import { KioskButton } from '../components/KioskButton';
@@ -16,10 +16,11 @@ interface BoardScreenProps {
   status: KioskStatus;
   onOtp: () => void;
   onWalkIn: () => void;
+  onStop: () => void;
 }
 
 /** The home screen: every charger of this station, and the two ways to start. No personal data appears here. */
-export function BoardScreen({ status, onOtp, onWalkIn }: BoardScreenProps) {
+export function BoardScreen({ status, onOtp, onWalkIn, onStop }: BoardScreenProps) {
   const [attract, setAttract] = useState(false);
   const [step, setStep] = useState(0);
 
@@ -63,7 +64,7 @@ export function BoardScreen({ status, onOtp, onWalkIn }: BoardScreenProps) {
             {PROMPTS[glow]}
           </p>
         )}
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-5">
           <KioskButton
             variant="secondary"
             block
@@ -75,6 +76,10 @@ export function BoardScreen({ status, onOtp, onWalkIn }: BoardScreenProps) {
           </KioskButton>
           <KioskButton block icon={<Plug className="size-8" aria-hidden="true" />} onClick={onWalkIn} className={cx('min-h-24 text-2xl', glow === 1 && 'attract-glow')}>
             No booking? Charge here
+          </KioskButton>
+          {/* For people who paid here and want to stop early: they type the stop code they were given. */}
+          <KioskButton variant="secondary" block icon={<Square className="size-8" aria-hidden="true" />} onClick={onStop} className="min-h-24 text-xl">
+            Stop &amp; refund
           </KioskButton>
         </div>
       </footer>

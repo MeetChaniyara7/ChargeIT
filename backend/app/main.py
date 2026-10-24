@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import APP_NAME, APP_VERSION, get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import setup_logging
+from app.features.admin.router import router as admin_router
 from app.features.auth.router import api_router as auth_api_router
 from app.features.auth.router import router as auth_router
 from app.features.availability.router import router as availability_router
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(chargers_router)
     app.include_router(kiosk_router)
     app.include_router(kiosk_admin_router)
+    app.include_router(admin_router)
 
     @app.get("/health", tags=["Health"])
     def health():

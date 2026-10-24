@@ -256,13 +256,13 @@ export const SearchBox: React.FC<SearchBoxProps> = (props) => {
             className={cx(
               'w-full rounded-full bg-transparent pr-9 text-fg placeholder:text-fg/60 focus:outline-none [&::-webkit-search-cancel-button]:hidden',
               // Compact over the map; full size (16px text stops iOS zooming in) when it fills the phone screen.
-              expanded ? 'min-h-11 pl-3 text-base' : 'min-h-9 pl-9 text-base lg:text-sm',
+              'min-h-11 text-base lg:text-sm', expanded ? 'pl-3' : 'pl-9',
             )}
           />
           {value && (
             <IconButton
               aria-label="Clear search"
-              className={cx('absolute right-0 top-0 rounded-full', !expanded && 'size-9!')}
+              className={cx('absolute right-0 top-0 rounded-full', !expanded && 'size-11!')}
               onClick={() => {
                 onChange('');
                 setActive(-1);
@@ -275,7 +275,7 @@ export const SearchBox: React.FC<SearchBoxProps> = (props) => {
         </div>
         <IconButton
           aria-label="Show my location"
-          className={cx('shrink-0 rounded-full', !expanded && 'size-9!')}
+          className={cx('shrink-0 rounded-full', !expanded && 'size-11!')}
           onClick={() => choose(onLocate)}
           disabled={locating}
         >

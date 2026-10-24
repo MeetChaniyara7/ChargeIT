@@ -213,7 +213,7 @@ export const AvailabilityGrid: React.FC<AvailabilityGridProps> = ({ availability
                       const range = `${formatTimeIST(block.start)} to ${formatTimeIST(block.end)}`;
                       const chosen = (picked && column >= picked[0] && column <= picked[1]) || (preview && column >= preview[0] && column <= preview[1]);
                       const description = `${charger.label}, ${range}, ${chosen ? 'your pick' : STATE_WORD[block.state]}`;
-                      const swatch = cx('h-10 w-full rounded', STATE_CLASS[chosen ? 'SELECTED' : block.state], changed?.has(`${charger.charger_id}|${block.start}`) && 'changed-flash');
+                      const swatch = cx('h-11 w-full rounded', STATE_CLASS[chosen ? 'SELECTED' : block.state], changed?.has(`${charger.charger_id}|${block.start}`) && 'changed-flash');
                       return (
                         <td key={block.start} role={interactive ? 'gridcell' : undefined} aria-selected={interactive ? !!chosen : undefined} className="p-0.5">
                           {interactive ? (
@@ -226,6 +226,7 @@ export const AvailabilityGrid: React.FC<AvailabilityGridProps> = ({ availability
                               }}
                               tabIndex={focusCell[0] === row && focusCell[1] === column ? 0 : -1}
                               aria-label={description}
+                              data-hit="dense"
                               aria-disabled={block.state !== 'FREE' || undefined}
                               onFocus={() => setFocusCell([row, column])}
                               onKeyDown={(e) => onKeyDown(e, row, column)}

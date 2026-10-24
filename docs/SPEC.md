@@ -1,6 +1,6 @@
 # ChargeSpot: what it does, what is built, what is not
 
-Everything here comes from the code and the plan in `docs/phases.md`. Where the code does not say, it says **TODO: confirm with me**. Status as of 2026-10-22 (Phases 0 to 5 are on `main`; the Phase 6 work is on branch `phase-6-kiosk`, tested but not yet committed or approved).
+Everything here comes from the code and the plan in `docs/phases.md`. Where the code does not say, it says **TODO: confirm with me**. Status as of 2026-10-22 (Phases 0 to 6 are on `main`; group (a) of Phase 7, the admin area and edge cases, is built on branch `phase-7-release`, tested but not yet committed or approved).
 
 ## What the project is
 
@@ -30,7 +30,7 @@ ChargeSpot is "BookMyShow for EV charging" (a college final-year project, free t
 - Hold for 5 minutes (countdown from the server's clock), pay with Razorpay Checkout (test mode), the server verifies the signature, then the booking is confirmed and a 6-digit code is shown **once**. A payment that arrives after the hold ran out re-books the slot if it is free, otherwise it is refunded in full.
 - "Just taken" sheet with alternatives (other times, other chargers, nearby stations) when someone else got the slot first.
 - Ticket page (movie-ticket style, code tiles, add to calendar as an `.ics` file, navigate).
-- "Charge now" on a free charger: no fee, up to 2 hours (or until the next booking minus 5 minutes).
+- "Charge now" on a free charger: no fee, up to 1 hour (or until the next booking minus 5 minutes).
 - My bookings (Upcoming, Past, Payment due): status timeline, cancel with the refund shown first, show a new code (the old one stops working), receipt page.
 - Vehicles: add, edit, delete, default; the default sets the plug filter and the cost estimate.
 - Unpaid energy bills block new bookings.
@@ -45,6 +45,21 @@ ChargeSpot is "BookMyShow for EV charging" (a college final-year project, free t
 
 - SQL jobs (`database/migrations/011_jobs.sql`) run every minute through `pg_cron` on Supabase and lazily inside the API: expire holds, mark no-shows, resolve occupied starts, auto-stop sessions, reserve chargers 15 minutes ahead.
 - Charger simulator (`simulate_charger_event`, admin endpoint, and `backend/scripts/simulate.py`): outside start (refused while reserved), outside stop, unplug, fault, recover; every event logged.
+
+### Admin (Phase 7, `/admin`, admins only)
+- Overview: today's bookings, charging now, no-shows this week, open alerts, 30-day revenue (booking fees, energy, walk-ins, net of refunds), bookings per day and no-shows per station as plain charts, and reports for a chosen range (bookings by status, revenue, refunds, operator settlement).
+- Stations: search, sort, pages; create and edit; mark inactive; the data-source badge ("Approximate" for generated data); chargers added and edited; **out of service** shows the future bookings it would break and cancels them with a full refund only when the admin confirms; restore.
+- Bookings: filters by station, status and day; a history timeline for each booking (who changed it, when and why).
+- Kiosks: every tablet with its last-seen time; create a key (shown once, with a copy button); revoke.
+- Simulator: pick a station and charger, press External start / Stop / Fault / Recover / Unplug, watch the live event log.
+- Alerts: kiosk code guessing and failed payment webhooks, marked as seen.
+- Users and roles: search accounts, make someone an admin or a driver again (not yourself, never the last admin).
+- Operators: add, rename, delete when they have no stations.
+- Kiosks: also rename a tablet and replace its key (the old key stops working at once).
+- Payments: every payment with refunds, filters and totals.
+- Activity log: who changed what, from the admin pages.
+- The admin has its own screen (header and sidebar), separate from the driver tabs.
+- Also: an error page, a 404 page, an offline notice and a session-ended notice on the whole app.
 
 ### The station kiosk (Phase 6, `frontend/kiosk/`)
 - A shared tablet app: a status board (every charger's state, kW, price, "free until", charging progress, walk-in money used), no names, phone numbers or bills of app users; sets itself up once with a pasted device key; goes back to the board after 30 seconds without a touch; a gentle "attract" loop after 2 minutes; a "Connection lost" cover that goes away by itself.
@@ -69,7 +84,7 @@ ChargeSpot is "BookMyShow for EV charging" (a college final-year project, free t
 |---|---|---|
 | **Real refunds through Razorpay** | `cancel()` and `_refund_in_full()` record the refund on the booking and payment only; no call to Razorpay's refund API. | Recorded only (test mode) |
 | **Razorpay webhook** | `POST /api/payments/webhook` handles `payment.captured`, `order.paid` and `payment_link.paid` and is tested, but no webhook is registered (needs a public URL). Until then walk-ins are confirmed by the kiosk asking Razorpay about the payment link. | Waiting for deployment |
-| **Admin area** (`/admin`) | `require_admin` and admin-only endpoints exist (create station, simulate, start, kiosk keys). No admin pages, reports, alerts list or operator settlement. | Not started (Phase 7) |
+| **Admin: reports export, operator payouts, deleting accounts** | The admin area shows reports on screen. There is no CSV export, no payout flow and no way to delete or suspend an account (roles can be changed). | Not planned |
 | **Deployment** (Render, Vercel), **CI** (GitHub Actions) | No deploy config, Dockerfile or workflow in the repo. | Not started (Phase 7) |
 | **Final README, demo script, booking-flow docs** | `README.md` says "the full README arrives in Phase 7". | Not started |
 | **Two-wheeler section** | Stations tagged `TWO_WHEELER` are stored and hidden everywhere (`vehicle_category = 'FOUR_WHEELER'` filter). | Data kept, no UI |

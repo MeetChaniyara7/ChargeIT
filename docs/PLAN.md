@@ -16,19 +16,11 @@ Based on the state of the code on 2026-10-22 and the phase plan in `docs/phases.
 
 - [x] **Phase 5: Background jobs, simulator, realtime, live charging.** Committed and on `main` (`3f85b1e`, with the documentation set): migrations 011 to 013 applied to Supabase, jobs on `pg_cron`, simulator, live charging page, realtime nudges. The owner's manual browser check (two browsers on one station page) is still open.
 
-- [ ] **Phase 6: Station kiosk and energy billing.** Built, tested and checked in a real browser; **not committed**, branch `phase-6-kiosk`, waiting for the owner's review.
-  - [x] Migration 014 (`admin_alerts`; new `finish_session` and `auto_stop_sessions` for walk-in settlement): **applied to Supabase**.
-  - [x] API: `features/kiosk/` (device keys, status board, code start with cooldown and alerts, walk-ins with Razorpay payment links), `/api/me/sessions/{id}/pay`, `/pay/verify`, `/receipt`, `payment_link.paid` webhook, `scripts/make_kiosk_key.py`.
-  - [x] Kiosk app `frontend/kiosk/` (setup, board, code pad, walk-in, started, ended, connection lost, attract loop) at 1280 x 800 and 1024 x 768; `qrcode.react` is its only new dependency.
-  - [x] Web: Pay button on the summary and the Payment due tab, dues banner wording, receipt page with print stylesheet.
-  - [x] Tests: backend 638, database 125, web 17, kiosk 15, shared 40; builds and lint clean.
-  - [x] Live check on Supabase with the real Razorpay test gateway: kiosk key, board, wrong code and cooldown, code start, unplug, energy order, signature check, receipt, walk-in payment link (`rzp.io`), signed webhook, charging, refund of the leftover (for example paid ₹100, used ₹2.50, ₹97.50 refunded).
-  - [ ] Not yet done: paying a walk-in QR with a phone in Razorpay's test page (a signed webhook stood in), a run on a real tablet, the owner's manual test script (`docs/kiosk.md`).
-  - [ ] Review, then commit and merge (owner decides).
+- [x] **Phase 6: Station kiosk and energy billing.** Committed and merged to `main` (`b8e636a`), pushed to GitHub. Not yet done: paying a walk-in QR with a phone in Razorpay's test page, a run on a real tablet, the owner's manual test script (`docs/kiosk.md`).
 
 ## Not started
 
-- [ ] **Phase 7: Admin, hardening, docs, deployment.** `/admin` pages (stations, chargers, kiosks, simulator panel, alerts, reports, operator settlement); edge-case tests; GitHub Actions CI; final README, `docs/booking-flow.md`, demo script; deploy to Render (API) and Vercel (web, kiosk); register the Razorpay webhook; Google OAuth production URLs; jury rehearsal.
+- [ ] **Phase 7: Admin, hardening, docs, deployment.** In progress on branch `phase-7-release`, in the order of the plan: **(a) admin area and edge cases: built and tested, waiting for the owner** (migrations 015 and 016, `features/admin/`, the admin's own screen with users and roles, operators, kiosk keys, payments and an activity log, error/404/offline pages, accessibility and responsive audit: `docs/audit.md`); (b) tests and CI, (c) documentation and demo script, (d) deployment, (e) final clean-up: not started.
 
 ## Loose ends (not in a phase)
 

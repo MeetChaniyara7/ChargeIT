@@ -4,7 +4,7 @@
 
 ## Project
 
-ChargeSpot is "BookMyShow for EV charging", a college final-year project built only with free tools. Drivers find stations in Gujarat, hold a 30-minute slot, pay a ₹199 booking fee (Razorpay test mode), get a one-time code, and watch charging live. Status: phases 0 to 4 are on `main`; phase 5 (jobs, simulator, realtime, live charging) is on `main`; phase 6 (kiosk, energy-bill payment, receipts) is built on branch `phase-6-kiosk`, waiting for review; the admin area and deployment (phase 7) are not started. Details: `docs/SPEC.md`, `docs/PLAN.md`.
+ChargeSpot is "BookMyShow for EV charging", a college final-year project built only with free tools. Drivers find stations in Gujarat, hold a 30-minute slot, pay a ₹199 booking fee (Razorpay test mode), get a one-time code, and watch charging live. Status: phases 0 to 4 are on `main`; phase 5 (jobs, simulator, realtime, live charging) is on `main`; phase 6 (kiosk, energy-bill payment, receipts) is on `main` too; phase 7 is in progress on branch `phase-7-release`: the admin area and edge cases (group a) are built and waiting for review; tests and CI, docs, deployment and clean-up are not done. Details: `docs/SPEC.md`, `docs/PLAN.md`.
 
 ## Tech stack
 
@@ -90,6 +90,7 @@ python -m scripts.make_kiosk_key "Riya Autolink" --name "Entrance kiosk"   # a k
 - **Pure modules** (`scoring.py`, `refunds.py`, `energy.py`, `slots.py`, `selection.ts`, `parseSearch`) have no database or network access and their own unit tests.
 - **Rules that must always hold live in the database:** `bookings_no_double_booking` (catch SQLSTATE `23P01`; retry once on `40P01`), `allowed_booking_transitions` + trigger (tell it who and why with `state_machine.set_actor()`), and the SQL job functions in `011_jobs.sql`. Lazy checks (`features/jobs/lazy.py`) re-run them before reads.
 - **Tests:** pytest with a rolled-back transaction per test (`db` / `db_client` fixtures, `tests/factories.py`); the SQL job tests call functions with a chosen `p_now`.
+- **Admin:** every `/api/admin/*` route needs role ADMIN on the server (`require_admin`); pages under `/admin` only hide themselves. Taking a charger or station out of use with future bookings answers `409 HAS_FUTURE_BOOKINGS` and needs an explicit cancel-with-refund. Build admin screens from `components/ui` (`DataTable`, `Pagination`, `StatTile`, `ConfirmDialog`, `ColumnChart`). Every admin change is written to the activity log with `features/admin/audit.record()`; roles cannot be changed by the person themselves and the last admin cannot be removed. The admin has its own layout (`features/admin/AdminLayout.tsx`), outside the driver `AppLayout`.
 - **Kiosk:** shared and unattended, so it shows no names, phone numbers or bills; every call carries `X-Device-Key` and the API limits it to its own station; times follow the server clock; no hover-only behaviour; the root font is 20 px; polls the API (no Supabase key on the tablet). Pure logic (`lib/otp.ts`, `tiles.ts`, `format.ts`) has unit tests.
 - **Web app:** function components (`React.FC`), data through `useApiQuery(key, fetcher)` and `apiFetch` (`src/lib`), filters in the URL, hooks in their own files (fast-refresh lint), accessibility built in (labels, roles, 44 px targets, reduced-motion respected).
 - **Comments** explain why, in plain language; each module starts with a short docstring.

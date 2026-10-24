@@ -57,11 +57,22 @@ Choices visible in the codebase, with the reasoning. **"Documented"** means the 
 | 39 | **The kiosk polls the API** (board every 4 s, a walk-in every 2 s) instead of using Supabase Realtime | Inferred from the code and decided in Phase 6: the tablet is shared and unattended, so it should not hold a Supabase key; polling is simple and survives a dropped connection. |
 | 40 | **Wrong-code rule counted from `otp_attempts`**: every 5th wrong try in a row starts a 2-minute wait; a right code resets the count | Documented (`architecture.md` §9: 5 tries, 2 minutes, never a hard lock-out). Counting from the attempts table needs no extra column. |
 | 41 | **A right code outside its window counts as a wrong try**; a right code on a charger that cannot start does not | Phase 6 choice: a guess is a guess, but a broken charger is not the driver's fault. |
-| 42 | **A walk-in uses the "Charge now" window** (earlier of 2 hours and next booking minus 5 minutes, at least 15 minutes) | Documented (`architecture.md` §15: walk-in buffer 5 minutes before the next booking; instant maximum 2 hours). |
+| 42 | **A walk-in uses the "Charge now" window** (earlier of 1 hour and next booking minus 5 minutes, at least 15 minutes) | Documented (`architecture.md` §15: walk-in buffer 5 minutes before the next booking; instant maximum 2 hours). |
 | 43 | **A walk-in is confirmed only when Razorpay says so**: the `payment_link.paid` webhook, or the kiosk asking Razorpay about the link while no webhook is registered | Documented rule (a payment counts only after the API verified it with Razorpay); the polling path is a Phase 6 addition because the webhook needs a public URL. |
 | 44 | **Payment links get no short expiry**; the 3-minute hold is ours, and a late payment is refunded in full (recorded) | Razorpay requires a link to live at least 15 minutes. |
 | 45 | **Walk-in settlement lives in `finish_session`** and caps the bill at the prepaid amount | Every way a session ends (unplug, job, admin) must settle the same way; the job runs once a minute, so the meter can run a little past the money. |
 | 46 | **The energy receipt is `/receipts/session/:sessionId`**; `/receipts/:bookingId` stays the booking-fee receipt | The plan wrote `/receipts/:sessionId`, which clashes with the existing route. |
+| 47 | **A charger goes out of service only through an event** (`OUT_OF_SERVICE`, `RESTORE`) | Same rule as every status change (`architecture.md` §7.4): logged in `charger_events`. A repair does not undo it. |
+| 48 | **Out of service and "station inactive" refuse to break future bookings**: `409 HAS_FUTURE_BOOKINGS` until the admin chooses to cancel them with a full refund | Phase 7 constraint ("never silently break future bookings"). The server decides, so the UI cannot skip it; the dialog re-checks if a booking arrives while it is open. |
+| 49 | **An admin edit of power or price makes the charger `manual`** and clears its estimated fields | "Show unknown or Approximate instead of inventing values": once a person enters a value it is no longer generated. |
+| 50 | **Alerts de-duplicate**: the same unseen alert within 10 minutes is shown once | The webhook address is public; one flood of bad calls must not become hundreds of alerts. |
+| 51 | **Admin charts are plain SVG and CSS**, no chart library | Phase 7 UI prompt: ask before adding a library; two simple charts do not need one. |
+| 52 | **Reports use India-time days; revenue is net of refunds; operator settlement = paid energy bills + walk-in sessions, per station operator** | Phase 7 task 7.1; the owner can change what counts as settlement later. |
+| 53 | **Tap-size exceptions are marked in the code** (`data-hit`): the small "Approximate" tag (larger invisible tap area), the dense slot grid (44 px tall, narrow so a day fits), map pins (the same stations are in the list) | `docs/audit.md`. |
+| 54 | **Role changes are guarded**: nobody changes their own role, and the last admin cannot be removed | A mistake here could lock every admin out. The role is read from the database on each request, so a change works at once. |
+| 55 | **Every admin change is written to an activity log** (`admin_actions`) with the admin's email | Accountability for the jury and for the owner; the email is copied so the line stays readable if an account is deleted. |
+| 56 | **Replacing a kiosk key makes a new device row and revokes the old one** (rather than editing the key) | Only a hash is stored, and the key must be shown once; revoked rows stay as history. |
+| 57 | **The admin has its own screen inside the same app** (not a separate app) | One login, one build and one deployment; it can be split into its own app later without changing the API. |
 
 ## Decided by the owner (2026-10-21)
 

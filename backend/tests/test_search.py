@@ -89,6 +89,17 @@ def test_operator_counts_ignore_hidden_stations(db):
 
 
 @needs_db
+def test_the_brand_chips_list_busiest_brands_first_and_skip_hidden_stations(db):
+    for i in range(2):
+        make_charger(db, make_station(db, f"Tata {i}", operator="Zz Brand A"))
+    make_charger(db, make_station(db, "One", operator="Zz Brand B"))
+    make_charger(db, make_station(db, "Gone", operator="Zz Brand C", active=False))
+    make_charger(db, make_station(db, "Scooter", operator="Zz Brand D", category="TWO_WHEELER"))
+    ours = [(n, c) for n, c in repository.top_operators(db, 50) if n.startswith("Zz Brand")]
+    assert ours == [("Zz Brand A", 2), ("Zz Brand B", 1)]
+
+
+@needs_db
 def test_two_wheeler_stations_are_never_suggested(db):
     make_charger(db, make_station(db, "Scooter Point", category="TWO_WHEELER"))
     assert suggest(db, "scooter").stations == []

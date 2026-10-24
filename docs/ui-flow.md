@@ -139,7 +139,7 @@ Chargers  [CCS2 30 kW ₹18] [CHAdeMO 25 kW ₹19.50]  (Approximate)
 - A block that cannot be picked says why in one line under the grid ("That block is already booked.", "A block in between isn't free...", "You can book up to 4 blocks...").
 - The **summary bar** slides up above the phone tabs: charger, "Sat 12 Oct · 4:30–5:30 PM", booking fee ₹199, "Est. charging ₹486 (estimate)" and **Hold & pay**. The estimate is power x time x 90% efficiency x price, capped by the default vehicle's battery when its plug fits; it is blank, never invented, when price or power is unknown.
 - The pick is remembered for the session, so it survives a refresh, an expired hold, and the trip to Hold & pay.
-- **Charge now** appears under the name of a charger that is free right now (today's grid): a sheet explains "no fee, up to 2 hours", then the Ticket shows the code.
+- **Charge now** appears under the name of a charger that is free right now (today's grid): a sheet explains "no fee, up to 1 hours", then the Ticket shows the code.
 - With an unpaid bill, picking is switched off and a banner links to Bookings -> Payment due.
 - If someone else got the slot first, the sheet **"Just taken. Here are alternatives"** lists other times on the same charger, other chargers here and nearby stations; each time or charger is held in one tap.
 
