@@ -63,6 +63,32 @@ Generated from the running app's own OpenAPI spec (`app.openapi()`, the same dat
 | POST | `/api/admin/devices/{device_id}/disable` | Admin only | Switch a kiosk off (a lost tablet). Its key stops working at once. |
 | GET | `/api/admin/stations/{station_id}/devices` | Admin only | List Devices |
 | POST | `/api/admin/stations/{station_id}/devices` | Admin only | Create a kiosk key for a station. The key is in this response only; copy it to the tablet now. |
+| GET | `/api/admin/activity` | Admin only | What admins changed, newest first. |
+| GET | `/api/admin/alerts` | Admin only | Alerts |
+| POST | `/api/admin/alerts/{alert_id}/seen` | Admin only | Alert Seen |
+| GET | `/api/admin/bookings` | Admin only | Bookings by slot start (India-time days), newest first. |
+| GET | `/api/admin/bookings/{booking_id}/events` | Admin only | The booking history: every status change, who made it and why. |
+| PATCH | `/api/admin/chargers/{charger_id}` | Admin only | Edit a charger. Entering a power or price makes the value real: it loses its Approximate tag. |
+| GET | `/api/admin/chargers/{charger_id}/affected` | Admin only | What taking this charger out of service would break: the future bookings, and whether someone is charging. |
+| GET | `/api/admin/chargers/{charger_id}/events` | Admin only | The newest charger events first (the simulator live log). |
+| POST | `/api/admin/chargers/{charger_id}/out-of-service` | Admin only | Take a charger out of service. With future bookings it needs `cancel_bookings = true` (409 HAS_FUTURE_BOOKINGS otherwise); |
+| POST | `/api/admin/chargers/{charger_id}/restore` | Admin only | Put an out-of-service charger back in use. |
+| GET | `/api/admin/devices` | Admin only | Devices |
+| PATCH | `/api/admin/devices/{device_id}` | Admin only | Rename Device |
+| POST | `/api/admin/devices/{device_id}/rotate` | Admin only | A new key for the same tablet and station. The old key stops working at once; the new one is in this answer only. |
+| GET | `/api/admin/operators` | Admin only | Operators |
+| POST | `/api/admin/operators` | Admin only | Create Operator |
+| DELETE | `/api/admin/operators/{operator_id}` | Admin only | Only an operator with no stations can be deleted (409 OPERATOR_IN_USE otherwise). |
+| PATCH | `/api/admin/operators/{operator_id}` | Admin only | Update Operator |
+| GET | `/api/admin/overview` | Admin only | Today numbers, 30-day revenue and the two chart series. |
+| GET | `/api/admin/payments` | Admin only | Every payment, newest first, with its refunds and the totals of what matches. |
+| GET | `/api/admin/reports` | Admin only | Bookings by status, no-shows, revenue (booking fees, energy, walk-ins), refunds and operator settlement. |
+| GET | `/api/admin/stations` | Admin only | Stations |
+| GET | `/api/admin/stations/{station_id}` | Admin only | Get Station |
+| PATCH | `/api/admin/stations/{station_id}` | Admin only | Edit a station. Taking it off the map while it has future bookings needs `cancel_bookings = true` (409 HAS_FUTURE_BOOKINGS otherwise). |
+| POST | `/api/admin/stations/{station_id}/chargers` | Admin only | Create Charger |
+| GET | `/api/admin/users` | Admin only | Users |
+| PATCH | `/api/admin/users/{user_id}/role` | Admin only | Make an account an admin, or an ordinary driver again. You cannot change your own role, and the last admin cannot be removed. |
 
 ## Endpoints by area
 
@@ -271,7 +297,7 @@ How many stations are on the map (shown on the landing page).
 
 **Responses**
 
-- **200** Successful Response: `StationCount`
+- **200** Successful Response: `app__features__stations__schemas__StationCount`
 
 #### `GET /api/stations/{station_id}`
 
@@ -921,6 +947,486 @@ Create a kiosk key for a station. The key is in this response only; copy it to t
 
 - **201** Successful Response: `DeviceCreated`
 
+### Admin
+
+#### `GET /api/admin/activity`
+
+What admins changed, newest first.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `page` | query | integer (>= 1) | no |  |
+| `page_size` | query | integer (>= 1, <= 100) | no |  |
+
+**Responses**
+
+- **200** Successful Response: `ActivityRows`
+
+#### `GET /api/admin/alerts`
+
+Alerts
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `include_seen` | query | boolean | no |  |
+
+**Responses**
+
+- **200** Successful Response: list of `AlertOut`
+
+#### `POST /api/admin/alerts/{alert_id}/seen`
+
+Alert Seen
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `alert_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `AlertOut`
+
+#### `GET /api/admin/bookings`
+
+Bookings by slot start (India-time days), newest first.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `station_id` | query | string (uuid) or null | no |  |
+| `status` | query | string or null | no |  |
+| `date_from` | query | string (date) or null | no |  |
+| `date_to` | query | string (date) or null | no |  |
+| `page` | query | integer (>= 1) | no |  |
+| `page_size` | query | integer (>= 1, <= 100) | no |  |
+
+**Responses**
+
+- **200** Successful Response: `BookingRows`
+
+#### `GET /api/admin/bookings/{booking_id}/events`
+
+The booking history: every status change, who made it and why.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `booking_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: list of `BookingEventOut`
+
+#### `PATCH /api/admin/chargers/{charger_id}`
+
+Edit a charger. Entering a power or price makes the value real: it loses its Approximate tag.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `charger_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `ChargerUpdate`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string (min length 1, max length 40) or null | no |  |
+| `connector_type` | one of `CCS2`, `TYPE2`, `CHADEMO`, `BHARAT_AC001`, `BHARAT_DC001`, `TYPE1`, `OTHER` or null | no |  |
+| `current_type` | one of `AC`, `DC` or null | no |  |
+| `power_kw` | number (<= 1000.0, > 0.0) or null | no |  |
+| `price_per_kwh` | number (>= 0.0, <= 1000.0) or null | no |  |
+
+**Responses**
+
+- **200** Successful Response: `AdminStation`
+
+#### `GET /api/admin/chargers/{charger_id}/affected`
+
+What taking this charger out of service would break: the future bookings, and whether someone is charging.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `charger_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `AffectedOut`
+
+#### `GET /api/admin/chargers/{charger_id}/events`
+
+The newest charger events first (the simulator live log).
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `charger_id` | path | string (uuid) | yes |  |
+| `limit` | query | integer (>= 1, <= 200) | no |  |
+
+**Responses**
+
+- **200** Successful Response: list of `ChargerEventOut`
+
+#### `POST /api/admin/chargers/{charger_id}/out-of-service`
+
+Take a charger out of service. With future bookings it needs `cancel_bookings = true` (409 HAS_FUTURE_BOOKINGS otherwise);
+each is then cancelled with a full refund of what was paid.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `charger_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `OutOfServiceRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `cancel_bookings` | boolean | no | Default: `False`. |
+
+**Responses**
+
+- **200** Successful Response: `OutOfServiceResult`
+
+#### `POST /api/admin/chargers/{charger_id}/restore`
+
+Put an out-of-service charger back in use.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `charger_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `OutOfServiceResult`
+
+#### `GET /api/admin/devices`
+
+Devices
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Responses**
+
+- **200** Successful Response: list of `DeviceRow`
+
+#### `PATCH /api/admin/devices/{device_id}`
+
+Rename Device
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `device_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `DeviceRename`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string (min length 1, max length 60) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `DeviceOut`
+
+#### `POST /api/admin/devices/{device_id}/rotate`
+
+A new key for the same tablet and station. The old key stops working at once; the new one is in this answer only.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `device_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **201** Successful Response: `DeviceCreated`
+
+#### `GET /api/admin/operators`
+
+Operators
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Responses**
+
+- **200** Successful Response: list of `OperatorRow`
+
+#### `POST /api/admin/operators`
+
+Create Operator
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Request body** (`application/json`): `OperatorIn`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string (min length 1, max length 120) | yes |  |
+| `website` | string (max length 300) or null | no |  |
+
+**Responses**
+
+- **201** Successful Response: `OperatorRow`
+
+#### `DELETE /api/admin/operators/{operator_id}`
+
+Only an operator with no stations can be deleted (409 OPERATOR_IN_USE otherwise).
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `operator_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **204** Successful Response: no body
+
+#### `PATCH /api/admin/operators/{operator_id}`
+
+Update Operator
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `operator_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `OperatorUpdate`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string (min length 1, max length 120) or null | no |  |
+| `website` | string (max length 300) or null | no |  |
+
+**Responses**
+
+- **200** Successful Response: `OperatorRow`
+
+#### `GET /api/admin/overview`
+
+Today numbers, 30-day revenue and the two chart series.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Responses**
+
+- **200** Successful Response: `OverviewOut`
+
+#### `GET /api/admin/payments`
+
+Every payment, newest first, with its refunds and the totals of what matches.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `purpose` | query | one of `BOOKING_FEE`, `ENERGY`, `WALKIN_PREPAID` or null | no |  |
+| `status` | query | one of `CREATED`, `CAPTURED`, `FAILED`, `REFUNDED`, `PARTIALLY_REFUNDED` or null | no |  |
+| `page` | query | integer (>= 1) | no |  |
+| `page_size` | query | integer (>= 1, <= 100) | no |  |
+
+**Responses**
+
+- **200** Successful Response: `PaymentRows`
+
+#### `GET /api/admin/reports`
+
+Bookings by status, no-shows, revenue (booking fees, energy, walk-ins), refunds and operator settlement.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `date_from` | query | string (date) or null | no | First day, India time. Default: 30 days ago. |
+| `date_to` | query | string (date) or null | no | Last day, India time. Default: today. |
+
+**Responses**
+
+- **200** Successful Response: `ReportOut`
+
+#### `GET /api/admin/stations`
+
+Stations
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `q` | query | string (max length 100) or null | no | Part of a station, city or operator name |
+| `sort` | query | string | no | name, city, operator, source, chargers or status |
+| `direction` | query | one of `asc`, `desc` | no |  |
+| `active` | query | boolean or null | no | Only active (true) or inactive (false) stations |
+| `page` | query | integer (>= 1) | no |  |
+| `page_size` | query | integer (>= 1, <= 100) | no |  |
+
+**Responses**
+
+- **200** Successful Response: `StationRows`
+
+#### `GET /api/admin/stations/{station_id}`
+
+Get Station
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `station_id` | path | string (uuid) | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `AdminStation`
+
+#### `PATCH /api/admin/stations/{station_id}`
+
+Edit a station. Taking it off the map while it has future bookings needs `cancel_bookings = true` (409 HAS_FUTURE_BOOKINGS otherwise).
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `station_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `StationUpdate`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string (min length 1, max length 160) or null | no |  |
+| `address` | string (max length 300) or null | no |  |
+| `city` | string (max length 120) or null | no |  |
+| `latitude` | number (>= -90.0, <= 90.0) or null | no |  |
+| `longitude` | number (>= -180.0, <= 180.0) or null | no |  |
+| `operator_id` | string (uuid) or null | no |  |
+| `opening_hours` | string (max length 300) or null | no |  |
+| `is_active` | boolean or null | no |  |
+| `cancel_bookings` | boolean | no | Default: `False`. |
+
+**Responses**
+
+- **200** Successful Response: `AdminStation`
+
+#### `POST /api/admin/stations/{station_id}/chargers`
+
+Create Charger
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `station_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `ChargerCreate`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `label` | string (min length 1, max length 40) | yes |  |
+| `connector_type` | one of `CCS2`, `TYPE2`, `CHADEMO`, `BHARAT_AC001`, `BHARAT_DC001`, `TYPE1`, `OTHER` | yes |  |
+| `current_type` | one of `AC`, `DC` or null | no |  |
+| `power_kw` | number (<= 1000.0, > 0.0) or null | no |  |
+| `price_per_kwh` | number (>= 0.0, <= 1000.0) or null | no |  |
+
+**Responses**
+
+- **201** Successful Response: `AdminStation`
+
+#### `GET /api/admin/users`
+
+Users
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `q` | query | string (max length 100) or null | no | Part of an email or name |
+| `role` | query | one of `USER`, `ADMIN` or null | no |  |
+| `page` | query | integer (>= 1) | no |  |
+| `page_size` | query | integer (>= 1, <= 100) | no |  |
+
+**Responses**
+
+- **200** Successful Response: `UserRows`
+
+#### `PATCH /api/admin/users/{user_id}/role`
+
+Make an account an admin, or an ordinary driver again. You cannot change your own role, and the last admin cannot be removed.
+
+**Auth:** Admin only (Bearer token, role ADMIN)
+
+**Parameters**
+
+| Name | In | Type | Required | Notes |
+|---|---|---|---|---|
+| `user_id` | path | string (uuid) | yes |  |
+
+**Request body** (`application/json`): `RoleChange`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `role` | one of `USER`, `ADMIN` | yes |  |
+
+**Responses**
+
+- **200** Successful Response: `UserRow`
+
 ## Response shapes
 
 Fields of the main response models, in the order the API returns them.
@@ -1275,13 +1781,16 @@ Raised with `AppError(status, code, message)`; the front end reacts to `code`. P
 | `WRONG_OTP` | 400 | `app/features/kiosk/service.py` |
 | `INVALID_DEVICE_KEY` | 401 | `app/features/kiosk/dependencies.py` |
 | `DEVICE_DISABLED` | 403 | `app/features/kiosk/dependencies.py` |
-| `BOOKING_NOT_FOUND` | 404 | `app/features/bookings/service.py`, `app/features/charging/service.py`, `app/features/payments/service.py` |
-| `CHARGER_NOT_FOUND` | 404 | `app/features/bookings/service.py`, `app/features/chargers/service.py`, `app/features/kiosk/walkin.py` |
-| `DEVICE_NOT_FOUND` | 404 | `app/features/kiosk/admin_router.py` |
+| `ALERT_NOT_FOUND` | 404 | `app/features/admin/service.py` |
+| `BOOKING_NOT_FOUND` | 404 | `app/features/admin/service.py`, `app/features/bookings/service.py`, `app/features/charging/service.py`, `app/features/payments/service.py` |
+| `CHARGER_NOT_FOUND` | 404 | `app/features/admin/service.py`, `app/features/bookings/service.py`, `app/features/chargers/service.py`, `app/features/kiosk/walkin.py` |
+| `DEVICE_NOT_FOUND` | 404 | `app/features/admin/manage.py`, `app/features/kiosk/admin_router.py` |
 | `NO_RECEIPT` | 404 | `app/features/charging/receipt.py` |
+| `OPERATOR_NOT_FOUND` | 404 | `app/features/admin/manage.py` |
 | `PAYMENT_NOT_FOUND` | 404 | `app/features/payments/service.py` |
 | `SESSION_NOT_FOUND` | 404 | `app/features/charging/service.py`, `app/features/payments/service.py` |
-| `STATION_NOT_FOUND` | 404 | `app/features/availability/service.py`, `app/features/kiosk/admin_router.py`, `app/features/stations/service.py` |
+| `STATION_NOT_FOUND` | 404 | `app/features/admin/service.py`, `app/features/availability/service.py`, `app/features/kiosk/admin_router.py`, `app/features/stations/service.py` |
+| `USER_NOT_FOUND` | 404 | `app/features/admin/manage.py` |
 | `VEHICLE_NOT_FOUND` | 404 | `app/features/vehicles/service.py` |
 | `WALK_IN_NOT_FOUND` | 404 | `app/features/kiosk/walkin.py` |
 | `ACTIVE_HOLD_EXISTS` | 409 | `app/features/bookings/service.py` |
@@ -1289,18 +1798,26 @@ Raised with `AppError(status, code, message)`; the front end reacts to `code`. P
 | `BOOKING_NOT_PAYABLE` | 409 | `app/features/payments/service.py` |
 | `BOOKING_NOT_STARTABLE` | 409 | `app/features/charging/service.py` |
 | `CANNOT_CANCEL` | 409 | `app/features/bookings/service.py` |
+| `CANNOT_CHANGE_OWN_ROLE` | 409 | `app/features/admin/manage.py` |
 | `CHARGER_BUSY` | 409 | `app/features/bookings/service.py`, `app/features/kiosk/walkin.py` |
+| `CHARGER_LABEL_TAKEN` | 409 | `app/features/admin/service.py` |
 | `CHARGER_OUT_OF_SERVICE` | 409 | `app/features/bookings/service.py` |
 | `CHARGER_UNAVAILABLE` | 409 | `app/features/charging/service.py`, `app/features/kiosk/walkin.py` |
 | `CODE_ALREADY_USED` | 409 | `app/features/bookings/service.py` |
 | `CODE_WINDOW_ENDED` | 409 | `app/features/bookings/service.py` |
 | `DEFAULT_REQUIRED` | 409 | `app/features/vehicles/service.py` |
+| `DEVICE_REVOKED` | 409 | `app/features/admin/manage.py` |
+| `HAS_FUTURE_BOOKINGS` | 409 | `app/features/admin/service.py` |
 | `HOLD_EXPIRED` | 409 | `app/features/payments/service.py` |
 | `ILLEGAL_STATUS_CHANGE` | 409 | `app/features/bookings/state_machine.py` |
+| `LAST_ADMIN` | 409 | `app/features/admin/manage.py` |
+| `NOT_OUT_OF_SERVICE` | 409 | `app/features/admin/service.py` |
 | `NO_BILL_DUE` | 409 | `app/features/payments/service.py` |
 | `NO_CODE_FOR_STATUS` | 409 | `app/features/bookings/service.py` |
 | `NO_ROOM_FOR_INSTANT` | 409 | `app/features/bookings/service.py` |
 | `NO_ROOM_FOR_WALK_IN` | 409 | `app/features/kiosk/walkin.py` |
+| `OPERATOR_IN_USE` | 409 | `app/features/admin/manage.py` |
+| `OPERATOR_NAME_TAKEN` | 409 | `app/features/admin/manage.py` |
 | `OTP_NOT_VALID_NOW` | 409 | `app/features/kiosk/service.py` |
 | `PRICE_UNKNOWN` | 409 | `app/features/kiosk/walkin.py` |
 | `SESSION_NOT_ENDED` | 409 | `app/features/charging/receipt.py`, `app/features/payments/service.py` |
@@ -1313,6 +1830,9 @@ Raised with `AppError(status, code, message)`; the front end reacts to `code`. P
 | `INVALID_BLOCKS` | 422 | `app/features/bookings/service.py` |
 | `INVALID_DURATION` | 422 | `app/features/recommendations/service.py` |
 | `INVALID_LOCATION` | 422 | `app/features/stations/router.py` |
+| `INVALID_RANGE` | 422 | `app/features/admin/service.py` |
+| `INVALID_SORT` | 422 | `app/features/admin/service.py` |
+| `OPERATOR_NOT_FOUND` | 422 | `app/features/admin/service.py` |
 | `QUERY_TOO_SHORT` | 422 | `app/features/geocoding/service.py`, `app/features/search/router.py` |
 | `SLOT_NOT_ALIGNED` | 422 | `app/features/bookings/service.py` |
 | `START_IN_PAST` | 422 | `app/features/bookings/service.py` |

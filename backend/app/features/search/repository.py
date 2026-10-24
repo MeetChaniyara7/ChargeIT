@@ -125,3 +125,17 @@ def find_operators(db: Session, text: str, min_similarity: float, limit: int) ->
 def find_cities(db: Session, text: str, min_similarity: float, limit: int) -> list[Match[Area]]:
     """Cities that have visible stations, with how many ("Ahmedabad " and "Ahmedabad" count as one)."""
     return _areas(db, func.trim(Station.city), text, min_similarity, limit)
+
+
+def top_operators(db: Session, limit: int) -> list[tuple[str, int]]:
+    """The brands with the most visible stations, for the filter chips: (name, how many stations)."""
+    count = func.count(Station.station_id)
+    rows = db.execute(
+        select(Operator.name, count)
+        .join(Station, Station.operator_id == Operator.operator_id)
+        .where(*_visible())
+        .group_by(Operator.name)
+        .order_by(count.desc(), Operator.name)
+        .limit(limit)
+    ).all()
+    return [(name, int(n)) for name, n in rows]

@@ -16,6 +16,7 @@ export type Place = Schemas['Place'];
 export type GeocodeResponse = Schemas['GeocodeResponse'];
 export type SuggestResponse = Schemas['SuggestResponse'];
 export type AreaSuggestion = Schemas['AreaSuggestion'];
+export type OperatorChip = Schemas['OperatorChip'];
 
 export interface LatLng {
   lat: number;

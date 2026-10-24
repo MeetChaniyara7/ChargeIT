@@ -218,6 +218,26 @@ def _raise_alert_if_needed(db: Session, device: StationDevice, now: datetime) ->
         ))
 
 
+def wrong_try(db: Session, device: StationDevice, now: datetime, *, right_code_wrong_time: bool = False) -> AppError:
+    """Counts a wrong code (for the cooldown and the alert) and returns the error to raise. Used by every code pad on the kiosk."""
+    _record(db, device, False, now)
+    _raise_alert_if_needed(db, device, now)
+    streak, _ = _wrong_streak(db, device)
+    left = BOOKING_RULES.kiosk_wrong_otp_limit - (streak % BOOKING_RULES.kiosk_wrong_otp_limit)
+    db.commit()
+    if left == BOOKING_RULES.kiosk_wrong_otp_limit:  # that was the last try of the block
+        return AppError(
+            429, "OTP_COOLDOWN", "Too many wrong codes. Please wait a moment.",
+            {"retry_after_seconds": BOOKING_RULES.kiosk_cooldown_minutes * 60},
+        )
+    if right_code_wrong_time:  # the right code, but outside its time window
+        return AppError(
+            409, "OTP_NOT_VALID_NOW", "This code works from 15 minutes before your slot until 10 minutes after it starts.",
+            {"tries_left": left},
+        )
+    return AppError(400, "WRONG_OTP", "That code is not right.", {"tries_left": left})
+
+
 def otp_start(db: Session, device: StationDevice, code: str, now: datetime) -> OtpStartOut:
     """A driver types the code from their booking: start that booking's charger."""
     wait = cooldown_left(db, device, now)
@@ -234,22 +254,7 @@ def otp_start(db: Session, device: StationDevice, code: str, now: datetime) -> O
     found = next(((b, c) for b, c in candidates if otp.matches(code, b.otp_hash)), None)
 
     if found is None or not otp.is_valid_now(found[0].start, now, found[0].otp_used_at):
-        _record(db, device, False, now)
-        _raise_alert_if_needed(db, device, now)
-        streak, _ = _wrong_streak(db, device)
-        left = BOOKING_RULES.kiosk_wrong_otp_limit - (streak % BOOKING_RULES.kiosk_wrong_otp_limit)
-        db.commit()
-        if left == BOOKING_RULES.kiosk_wrong_otp_limit:  # that was the last try of the block
-            raise AppError(
-                429, "OTP_COOLDOWN", "Too many wrong codes. Please wait a moment.",
-                {"retry_after_seconds": BOOKING_RULES.kiosk_cooldown_minutes * 60},
-            )
-        if found is not None:  # the right code, but outside its time window
-            raise AppError(
-                409, "OTP_NOT_VALID_NOW", "This code works from 15 minutes before your slot until 10 minutes after it starts.",
-                {"tries_left": left},
-            )
-        raise AppError(400, "WRONG_OTP", "That code is not right.", {"tries_left": left})
+        raise wrong_try(db, device, now, right_code_wrong_time=found is not None)
 
     booking, charger = found
     try:

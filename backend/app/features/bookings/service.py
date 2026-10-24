@@ -343,7 +343,7 @@ def create_hold(
 
 
 def create_instant(db: Session, user_id: UUID, charger_id: UUID, vehicle_id: UUID | None, now: datetime) -> InstantBookingOut:
-    """"Charge now": from this moment until the next booking (minus a buffer) or 2 hours. No fee."""
+    """"Charge now": from this moment until the next booking (minus a buffer) or 1 hour. No fee."""
     charger = _charger_for_booking(db, charger_id)
     run_due_jobs(db, now, charger.station_id)
     db.refresh(charger)  # the jobs may have changed its status

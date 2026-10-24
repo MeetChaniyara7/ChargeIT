@@ -16,6 +16,7 @@ export type ChargerTile = Schemas['ChargerTile'];
 export type WalkInOption = Schemas['WalkInOption'];
 export type WalkInOut = Schemas['WalkInOut'];
 export type OtpStartOut = Schemas['OtpStartOut'];
+export type WalkInStopOut = Schemas['WalkInStopOut'];
 
 const KEY_STORAGE = 'chargespot.kiosk.key';
 

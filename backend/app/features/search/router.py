@@ -10,8 +10,8 @@ from app.config import SEARCH_RULES
 from app.core.errors import AppError
 from app.db import get_db
 from app.features.auth.dependencies import get_current_user
-from app.features.search import service
-from app.features.search.schemas import SuggestResponse
+from app.features.search import repository, service
+from app.features.search.schemas import OperatorChip, SuggestResponse
 from app.features.stations.router import origin_from
 
 router = APIRouter(prefix="/api/search", tags=["Search"], dependencies=[Depends(get_current_user)])
@@ -29,5 +29,14 @@ def suggest(
     origin = origin_from(lat, lng)
     try:
         return service.suggest(db, q, datetime.now(timezone.utc), origin)
+    except SQLAlchemyError as exc:
+        raise AppError(503, "DATABASE_UNAVAILABLE", "Search is temporarily unavailable.") from exc
+
+
+@router.get("/operators", response_model=list[OperatorChip])
+def popular_operators(db: Session = Depends(get_db)):
+    """The brands with the most stations: the "Brand" filter chips on the Explore page."""
+    try:
+        return [OperatorChip(name=n, station_count=c) for n, c in repository.top_operators(db, 8)]
     except SQLAlchemyError as exc:
         raise AppError(503, "DATABASE_UNAVAILABLE", "Search is temporarily unavailable.") from exc

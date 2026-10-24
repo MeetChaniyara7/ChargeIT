@@ -68,6 +68,7 @@ export const ExploreList: React.FC<ExploreListProps> = ({
               index={index}
               station={rec.station}
               reason={rec.reason}
+              anchor={false}
               trip={{ minutes: rec.travel_minutes, distanceKm: rec.distance_km, routed: rec.travel_is_routed }}
               isSelected={selectedId === rec.station.station_id}
               onSelect={onSelect}

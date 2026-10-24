@@ -23,3 +23,6 @@ export const STATION_LIMIT = 500;
 
 /** How long the map must stand still before stations for the new area are requested. */
 export const MAP_SETTLE_MS = 400;
+
+/** The "Power" filter choices: chargers of at least this many kW. 50 is the same as the old "Fast" chip. */
+export const POWER_CHOICES_KW = [7, 22, FAST_KW, 100];

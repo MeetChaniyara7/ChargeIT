@@ -72,8 +72,10 @@ export const HoldPage: React.FC = () => {
     }
   };
 
+  const payingRef = useRef(false); // a fast double tap must not start two payments
   const pay = async () => {
-    if (!bookingId) return;
+    if (!bookingId || payingRef.current) return;
+    payingRef.current = true;
     setPaying(true);
     setProblem(null);
     try {
@@ -102,6 +104,7 @@ export const HoldPage: React.FC = () => {
         setProblem({ kind: 'other', message: error instanceof Error ? error.message : 'Something went wrong. Please try again.' });
       }
     } finally {
+      payingRef.current = false;
       setPaying(false);
       if (!leaving.current) retry(); // the server may have confirmed it (e.g. through the payment webhook) while Checkout was open
     }

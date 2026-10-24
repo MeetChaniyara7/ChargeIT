@@ -266,6 +266,7 @@ export const ExplorePage: React.FC = () => {
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem-4rem-env(safe-area-inset-bottom))] lg:h-[calc(100dvh-3.5rem)]">
+      <h1 className="sr-only">Find a charger</h1>
       {isDesktop && (
         <aside aria-label="Charging stations" className="w-[400px] shrink-0 overflow-y-auto border-r border-border p-4">
           {list}

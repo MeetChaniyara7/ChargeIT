@@ -4,7 +4,7 @@ import { cx } from '../components/cx';
 import { Keypad } from '../components/Keypad';
 import { KioskButton } from '../components/KioskButton';
 import { ApiError, kioskFetch } from '../lib/api';
-import type { OtpStartOut } from '../lib/api';
+import type { OtpStartOut, WalkInStopOut } from '../lib/api';
 import { clockMinutes } from '../lib/format';
 import { CODE_LENGTH, isComplete, otpFailureMessage, pressKey } from '../lib/otp';
 import type { PadKey } from '../lib/otp';
@@ -14,11 +14,14 @@ import { useIdleTimer } from '../lib/useIdleTimer';
 interface OtpScreenProps {
   idleSeconds: number;
   onBack: () => void;
-  onStarted: (result: OtpStartOut) => void;
+  /** "start" checks a booking code; "stop" checks the stop code of a walk-in and ends its charging. */
+  mode?: 'start' | 'stop';
+  onStarted?: (result: OtpStartOut) => void;
+  onStopped?: (result: WalkInStopOut) => void;
 }
 
 /** Six big boxes and a number pad. The server checks the code; this screen only shows what it says. */
-export function OtpScreen({ idleSeconds, onBack, onStarted }: OtpScreenProps) {
+export function OtpScreen({ idleSeconds, onBack, mode = 'start', onStarted, onStopped }: OtpScreenProps) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -40,7 +43,8 @@ export function OtpScreen({ idleSeconds, onBack, onStarted }: OtpScreenProps) {
     setBusy(true);
     setMessage(null);
     try {
-      onStarted(await kioskFetch<OtpStartOut>('/api/kiosk/otp-start', { method: 'POST', body: { otp: digits } }));
+      if (mode === 'stop') onStopped?.(await kioskFetch<WalkInStopOut>('/api/kiosk/walk-ins/stop', { method: 'POST', body: { code: digits } }));
+      else onStarted?.(await kioskFetch<OtpStartOut>('/api/kiosk/otp-start', { method: 'POST', body: { otp: digits } }));
     } catch (error) {
       setCode('');
       setBusy(false);
@@ -67,8 +71,12 @@ export function OtpScreen({ idleSeconds, onBack, onStarted }: OtpScreenProps) {
     <div className="flex h-full items-center justify-center gap-8 px-6 min-[1200px]:gap-16 min-[1200px]:px-10">
       <section className="max-w-[34rem] space-y-6 min-[1200px]:space-y-8">
         <div className="space-y-2">
-          <h1 className="text-5xl font-extrabold">Enter your code</h1>
-          <p className="text-xl text-muted">The 6-digit code from your booking in the ChargeSpot app.</p>
+          <h1 className="text-5xl font-extrabold">{mode === 'stop' ? 'Stop charging' : 'Enter your code'}</h1>
+          <p className="text-xl text-muted">
+            {mode === 'stop'
+              ? 'The 6-digit stop code shown on this screen after you paid. The unused money comes back to you.'
+              : 'The 6-digit code from your booking in the ChargeSpot app.'}
+          </p>
         </div>
 
         <div className="flex gap-3" role="group" aria-label={`Code, ${code.length} of ${CODE_LENGTH} digits typed`}>

@@ -187,7 +187,7 @@ export const StationPage: React.FC = () => {
   const goBack = () => (window.history.length > 1 ? navigate(-1) : navigate('/explore'));
 
   const backButton = (
-    <Button variant="ghost" size="sm" icon={<ArrowLeft className="size-4" aria-hidden="true" />} onClick={goBack}>
+    <Button variant="ghost" size="md" icon={<ArrowLeft className="size-4" aria-hidden="true" />} onClick={goBack}>
       Back
     </Button>
   );
@@ -377,7 +377,7 @@ export const StationPage: React.FC = () => {
                   rowAction={(charger) =>
                     isToday && freeNow.has(charger.charger_id) && !unpaid ? (
                       <Button
-                        size="sm"
+                        size="md"
                         variant="secondary"
                         className="mt-1"
                         icon={<Zap className="size-3.5" aria-hidden="true" />}

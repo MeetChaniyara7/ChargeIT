@@ -24,3 +24,8 @@ class SuggestResponse(BaseModel):
     cities: list[AreaSuggestion]
     # A close spelling when nothing contains the typed text, e.g. "Tata Power" for "tata powr".
     did_you_mean: str | None = None
+
+
+class OperatorChip(BaseModel):
+    name: str
+    station_count: int

@@ -279,7 +279,7 @@ def test_reading_an_expired_hold_marks_it_expired(db, world):
 def test_charge_now_is_free_confirmed_and_returns_a_code_once(db, world):
     booking = service.create_instant(db, world["user"], world["a"], None, NOW)
     assert booking.status == "CONFIRMED" and booking.source == "INSTANT" and booking.booking_fee == 0
-    assert booking.start == NOW and booking.end == NOW + timedelta(hours=2)
+    assert booking.start == NOW and booking.end == NOW + timedelta(hours=1)
     assert len(booking.otp) == 6 and booking.has_code
     stored = db.get(Booking, booking.booking_id).otp_hash
     assert booking.otp not in stored and otp.matches(booking.otp, stored)

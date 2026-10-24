@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UNAUTHORIZED_EVENT } from '../../lib/api';
 import type { AuthContextType, UserProfile } from './types';
 import { authService } from './authService';
+import { markSessionExpired } from './sessionNotice';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -41,7 +42,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 3. Sign out locally whenever the API rejects our token (expired or revoked).
-    const handleUnauthorized = () => setUser(null);
+    const handleUnauthorized = () => {
+      markSessionExpired(); // the sign-in page says why the user is back
+      setUser(null);
+    };
     window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
   }, []);

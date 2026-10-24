@@ -445,7 +445,7 @@ sequenceDiagram
 
 For a signed-in user who is already at, or near, a free charger:
 
-1. On the station page, tap **Charge now** on a free charger. This books the time from now until the earlier of that charger's next booking (minus 5 minutes) or 2 hours.
+1. On the station page, tap **Charge now** on a free charger. This books the time from now until the earlier of that charger's next booking (minus 5 minutes) or 1 hour.
 2. **No ₹199 fee.** The booking goes straight to `CONFIRMED` and the OTP appears immediately.
 3. From here it is identical to 7.1: OTP at the kiosk, live progress on the phone, energy bill paid in the web app.
 
@@ -702,7 +702,7 @@ All of these live in `backend/app/config.py`, so they can be changed without tou
 | No-show after | start + 10 min |
 | End-of-slot warning | 5 min before |
 | Walk-in / instant buffer before next booking | 5 min |
-| Instant booking maximum | 2 h |
+| Instant booking maximum | 1 h |
 | Walk-in amounts | ₹100, ₹200, ₹500, or "until the next booking" |
 | Refund tiers | ≥ 2 h: 100% · 30 min–2 h: 75% · 15–30 min: 50% · < 15 min: 0% |
 | Kiosk wrong-OTP cooldown | 5 tries → 2 min |
@@ -866,6 +866,7 @@ flowchart LR
 | `bookings` | Holds, instant bookings, codes, cancel, refunds | `state_machine.py`, `otp.py`, `refunds.py` (pure), `alternatives.py`, `instant.py`, `service.py` |
 | `payments` | Razorpay orders (booking fee, energy bill), verify, webhook (also `payment_link.paid`) | `gateway.py` (orders, payment links), `service.py` (`confirm_payment`, `create_energy_order`, `verify_energy`) |
 | `charging` | Sessions: live numbers, stop, start, bill payment routes, receipt | `energy.py` (pure), `service.py`, `receipt.py`, `router.py` |
+| `admin` | Overview and reports, station and charger management, out of service with refunds, bookings list and history, devices (rename, replace key), alerts, users and roles, operators, payments, the activity log | `service.py` and `manage.py` (users, operators, payments, keys, activity), `router.py` (`/api/admin`), `alerts.py` (`raise_alert`, de-duplicated), `audit.py` (the activity log) |
 | `kiosk` | Device keys, status board, OTP start with cooldown and alerts, walk-ins | `keys.py`, `dependencies.py` (`get_current_device`), `service.py` (board, `otp_start`), `walkin.py` (create, poll Razorpay, confirm, cancel), `router.py` (`/api/kiosk`), `admin_router.py` (keys) |
 | `chargers` | Admin charger simulator | `service.py` |
 | `jobs` | Lazy job checks | `lazy.py` |
@@ -883,7 +884,7 @@ src/features/<name>/       pages, components and hooks together: auth, home, sta
 src/lib/                   api.ts (apiFetch), useApiQuery, realtime + useRealtimeRefresh, razorpay, calendar, timers
 ```
 
-Routes (all signed-in routes sit inside `ProtectedRoute` + `AppLayout`): `/` (landing), `/login`, `/register`, `/explore`, `/stations/:stationId`, `/book/:bookingId`, `/tickets/:bookingId`, `/receipts/:bookingId` (booking fee), `/receipts/session/:sessionId` (energy bill), `/bookings`, `/charging`, `/charging/:sessionId`, `/profile`, `/profile/vehicles`, `/dev/ui` (development builds only); `/dashboard` redirects to `/explore`.
+Routes (all signed-in routes sit inside `ProtectedRoute` + `AppLayout`): `/` (landing), `/login`, `/register`, `/explore`, `/stations/:stationId`, `/book/:bookingId`, `/tickets/:bookingId`, `/receipts/:bookingId` (booking fee), `/receipts/session/:sessionId` (energy bill), `/admin` with `stations`, `stations/:id`, `operators`, `bookings`, `payments`, `kiosks`, `simulator`, `users`, `alerts`, `activity` (admins only, in their own layout), `/bookings`, `/charging`, `/charging/:sessionId`, `/profile`, `/profile/vehicles`, `/dev/ui` (development builds only); `/dashboard` redirects to `/explore`.
 
 The kiosk app (`frontend/kiosk/src/`) has `app/App.tsx` (the state machine: board, code pad, walk-in, started, setup), `screens/`, `components/` (button, charger tile, keypad, overlay), and `lib/` (`api.ts` with the device key, `useKioskStatus`, `useIdleTimer`, `useCountdown`, pure `otp.ts`, `tiles.ts`, `format.ts`). It reuses `@chargespot/shared` and the design tokens; the root font size is 20 px so everything scales for a metre's reading distance.
 
@@ -918,7 +919,7 @@ Patterns: data comes from `useApiQuery(key, fetcher)` (keeps old data while load
 
 ### 18.8 Differences between the plan and the code
 
-- The admin area (`/admin`) is not built. Kiosk keys are made with `python -m scripts.make_kiosk_key` (or the admin API), and kiosk alerts are stored in `admin_alerts` with no page to show them yet.
+- The admin area (`/admin`, Phase 7 group a) is built: stations, chargers, out of service with the cancel-with-refund rule, bookings with history, kiosks, simulator, alerts, reports. Not built yet from Phase 7: CI, the final docs and deployment. Kiosk keys can also be made with `python -m scripts.make_kiosk_key`.
 - The kiosk does not use Supabase Realtime: it polls (status board every 4 seconds, a walk-in every 2 seconds), so the tablet holds no Supabase key.
 - Kiosk and bill routes are under `/api` (`/api/kiosk/...`, `/api/me/sessions/{id}/pay`), not `/kiosk/...` as the plan wrote.
 - The Razorpay **webhook** is implemented (booking fee, energy bill, `payment_link.paid`) but not registered with Razorpay. Until it is, a walk-in is confirmed by the kiosk asking Razorpay about the payment link.

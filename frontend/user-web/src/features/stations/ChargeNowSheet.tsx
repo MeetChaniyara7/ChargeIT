@@ -35,7 +35,7 @@ export const ChargeNowSheet: React.FC<ChargeNowSheetProps> = ({ open, onClose, s
       <li>
         <span className="font-medium text-fg">No booking fee.</span> You pay for the energy you use, after charging.
       </li>
-      <li>Starts now and lasts up to 2 hours, or until the next booking on this charger.</li>
+      <li>Starts now and lasts up to 1 hour, or until the next booking on this charger.</li>
       <li>You will get a code to type on the screen at the station. It is shown once.</li>
     </ul>
     {error && (

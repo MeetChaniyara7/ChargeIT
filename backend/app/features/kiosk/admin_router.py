@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.db import get_db
+from app.features.admin import audit
 from app.features.auth.dependencies import require_admin
+from app.features.auth.models import User
 from app.features.kiosk import keys
 from app.features.kiosk.models import StationDevice
 from app.features.kiosk.schemas import DeviceCreate, DeviceCreated, DeviceOut
@@ -29,9 +31,10 @@ def create_device(db: Session, station_id: UUID, name: str) -> tuple[StationDevi
 
 
 @router.post("/stations/{station_id}/devices", response_model=DeviceCreated, status_code=201)
-def new_device(station_id: UUID, body: DeviceCreate, db: Session = Depends(get_db)):
+def new_device(station_id: UUID, body: DeviceCreate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     """Create a kiosk key for a station. The key is in this response only; copy it to the tablet now."""
     device, key = create_device(db, station_id, body.name)
+    audit.record(db, admin, "KIOSK_KEY_CREATED", device.name, {"station_id": str(station_id), "key_prefix": device.key_prefix})
     return DeviceCreated(**DeviceOut.model_validate(device, from_attributes=True).model_dump(), key=key)
 
 
@@ -41,11 +44,12 @@ def list_devices(station_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/devices/{device_id}/disable", response_model=DeviceOut)
-def disable_device(device_id: UUID, db: Session = Depends(get_db)):
+def disable_device(device_id: UUID, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     """Switch a kiosk off (a lost tablet). Its key stops working at once."""
     device = db.get(StationDevice, device_id)
     if device is None:
         raise AppError(404, "DEVICE_NOT_FOUND", "Kiosk not found.")
     device.is_active = False
     db.commit()
+    audit.record(db, admin, "KIOSK_KEY_REVOKED", device.name, {"key_prefix": device.key_prefix})
     return device

@@ -9,17 +9,17 @@ NOW = datetime(2026, 10, 12, 10, 7, tzinfo=timezone.utc)
 M = timedelta(minutes=1)
 
 
-def test_instant_window_without_a_later_booking_is_two_hours():
-    assert instant_window(NOW, None) == (NOW, NOW + 120 * M)
+def test_instant_window_without_a_later_booking_is_one_hour():
+    assert instant_window(NOW, None) == (NOW, NOW + 60 * M)
 
 
 def test_instant_window_stops_five_minutes_before_the_next_booking():
     assert instant_window(NOW, NOW + 60 * M) == (NOW, NOW + 55 * M)
 
 
-def test_a_booking_more_than_two_hours_away_does_not_shorten_it():
-    assert instant_window(NOW, NOW + 300 * M) == (NOW, NOW + 120 * M)
-    assert instant_window(NOW, NOW + 125 * M) == (NOW, NOW + 120 * M)  # exactly the maximum
+def test_a_booking_more_than_an_hour_away_does_not_shorten_it():
+    assert instant_window(NOW, NOW + 300 * M) == (NOW, NOW + 60 * M)
+    assert instant_window(NOW, NOW + 65 * M) == (NOW, NOW + 60 * M)  # exactly the maximum
 
 
 def test_no_window_when_the_next_booking_is_too_close():

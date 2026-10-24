@@ -85,6 +85,8 @@ class WalkInOut(BaseModel):
     seconds_left: int
     session_id: UUID | None = None  # once PAID
     refunded: float = 0  # a payment that arrived too late is refunded in full (recorded; no money moves in test mode)
+    # Only in the answer that creates the walk-in: the code the person types at the kiosk to stop early and get the unused money back.
+    stop_code: str | None = None
 
 
 class DeviceCreate(BaseModel):
@@ -103,3 +105,14 @@ class DeviceOut(BaseModel):
 
 class DeviceCreated(DeviceOut):
     key: str  # shown this once; only its hash is stored
+
+
+class WalkInStop(BaseModel):
+    code: str = Field(min_length=1, max_length=12)
+
+
+class WalkInStopOut(BaseModel):
+    charger_label: str
+    prepaid: float
+    used: float
+    refunded: float
